@@ -58,3 +58,41 @@ screenshots/
 # Keep old files during transition
 call_model.py
 app_package_name.py
+
+# Android/Kotlin
+*.iml
+.gradle/
+local.properties
+.cxx/
+*.hprof
+
+# Android build outputs
+android/app/build/
+android/build/
+android/.gradle/
+android/app/release/
+android/app/debug/
+
+# Android generated files
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Android signing
+*.jks
+*.keystore
+
+# Android NDK
+*.externalNativeBuild/
+.cxx/
+
+# Model files (large, downloaded at runtime)
+*.gguf
+*.bin
+*.safetensors
+
+# Environment files
+.env
+.env.local
+*.env
