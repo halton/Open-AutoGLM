@@ -1,0 +1,294 @@
+package com.openautoglm.agent.inference
+
+import android.content.Context
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+import java.security.KeyStore
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+
+/**
+ * Secure storage for API keys and sensitive credentials using Android Keystore.
+ *
+ * This class provides encrypted storage for model API keys (BigModel, DashScope, OpenAI, etc.)
+ * using Android's security best practices:
+ * - EncryptedSharedPreferences for automatic encryption/decryption
+ * - MasterKey backed by Android Keystore
+ * - Keys never stored in plain text
+ *
+ * @param context Application context
+ */
+class SecureKeyStorage(context: Context) {
+
+    private val masterKey: MasterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
+
+    private val sharedPreferences = EncryptedSharedPreferences.create(
+        context,
+        PREFS_FILENAME,
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
+
+    companion object {
+        private const val PREFS_FILENAME = "autoglm_secure_keys"
+
+        // Key names for different API providers
+        private const val KEY_BIGMODEL_API_KEY = "bigmodel_api_key"
+        private const val KEY_DASHSCOPE_API_KEY = "dashscope_api_key"
+        private const val KEY_OPENAI_API_KEY = "openai_api_key"
+        private const val KEY_CUSTOM_API_KEY = "custom_api_key"
+        private const val KEY_CUSTOM_API_BASE_URL = "custom_api_base_url"
+
+        // Model configuration keys
+        private const val KEY_SELECTED_PROVIDER = "selected_provider"
+        private const val KEY_BIGMODEL_MODEL_ID = "bigmodel_model_id"
+        private const val KEY_DASHSCOPE_MODEL_ID = "dashscope_model_id"
+
+        // Default model IDs
+        const val DEFAULT_BIGMODEL_MODEL = "AutoGLM-Phone-9B"
+        const val DEFAULT_DASHSCOPE_MODEL = "qwen2.5-vl-72b-instruct"
+    }
+
+    /**
+     * Stores the BigModel API key securely.
+     *
+     * @param apiKey The API key to store
+     */
+    fun setBigModelApiKey(apiKey: String) {
+        sharedPreferences.edit()
+            .putString(KEY_BIGMODEL_API_KEY, apiKey)
+            .apply()
+    }
+
+    /**
+     * Retrieves the BigModel API key.
+     *
+     * @return The API key, or null if not set
+     */
+    fun getBigModelApiKey(): String? {
+        return sharedPreferences.getString(KEY_BIGMODEL_API_KEY, null)
+    }
+
+    /**
+     * Stores the DashScope API key securely.
+     *
+     * @param apiKey The API key to store
+     */
+    fun setDashScopeApiKey(apiKey: String) {
+        sharedPreferences.edit()
+            .putString(KEY_DASHSCOPE_API_KEY, apiKey)
+            .apply()
+    }
+
+    /**
+     * Retrieves the DashScope API key.
+     *
+     * @return The API key, or null if not set
+     */
+    fun getDashScopeApiKey(): String? {
+        return sharedPreferences.getString(KEY_DASHSCOPE_API_KEY, null)
+    }
+
+    /**
+     * Stores the OpenAI API key securely.
+     *
+     * @param apiKey The API key to store
+     */
+    fun setOpenAIApiKey(apiKey: String) {
+        sharedPreferences.edit()
+            .putString(KEY_OPENAI_API_KEY, apiKey)
+            .apply()
+    }
+
+    /**
+     * Retrieves the OpenAI API key.
+     *
+     * @return The API key, or null if not set
+     */
+    fun getOpenAIApiKey(): String? {
+        return sharedPreferences.getString(KEY_OPENAI_API_KEY, null)
+    }
+
+    /**
+     * Stores a custom API key and base URL for self-hosted or alternative providers.
+     *
+     * @param apiKey The API key to store
+     * @param baseUrl The base URL for the API endpoint
+     */
+    fun setCustomApiConfig(apiKey: String, baseUrl: String) {
+        sharedPreferences.edit()
+            .putString(KEY_CUSTOM_API_KEY, apiKey)
+            .putString(KEY_CUSTOM_API_BASE_URL, baseUrl)
+            .apply()
+    }
+
+    /**
+     * Retrieves the custom API key.
+     *
+     * @return The API key, or null if not set
+     */
+    fun getCustomApiKey(): String? {
+        return sharedPreferences.getString(KEY_CUSTOM_API_KEY, null)
+    }
+
+    /**
+     * Retrieves the custom API base URL.
+     *
+     * @return The base URL, or null if not set
+     */
+    fun getCustomApiBaseUrl(): String? {
+        return sharedPreferences.getString(KEY_CUSTOM_API_BASE_URL, null)
+    }
+
+    /**
+     * Sets the selected inference provider.
+     *
+     * @param provider The provider to use (bigmodel, dashscope, openai, custom)
+     */
+    fun setSelectedProvider(provider: InferenceProvider) {
+        sharedPreferences.edit()
+            .putString(KEY_SELECTED_PROVIDER, provider.name)
+            .apply()
+    }
+
+    /**
+     * Gets the selected inference provider.
+     *
+     * @return The selected provider, or BIGMODEL as default
+     */
+    fun getSelectedProvider(): InferenceProvider {
+        val providerName = sharedPreferences.getString(KEY_SELECTED_PROVIDER, InferenceProvider.BIGMODEL.name)
+        return InferenceProvider.valueOf(providerName ?: InferenceProvider.BIGMODEL.name)
+    }
+
+    /**
+     * Sets the BigModel model ID.
+     *
+     * @param modelId The model ID to use
+     */
+    fun setBigModelModelId(modelId: String) {
+        sharedPreferences.edit()
+            .putString(KEY_BIGMODEL_MODEL_ID, modelId)
+            .apply()
+    }
+
+    /**
+     * Gets the BigModel model ID.
+     *
+     * @return The model ID, or default if not set
+     */
+    fun getBigModelModelId(): String {
+        return sharedPreferences.getString(KEY_BIGMODEL_MODEL_ID, DEFAULT_BIGMODEL_MODEL)
+            ?: DEFAULT_BIGMODEL_MODEL
+    }
+
+    /**
+     * Sets the DashScope model ID.
+     *
+     * @param modelId The model ID to use
+     */
+    fun setDashScopeModelId(modelId: String) {
+        sharedPreferences.edit()
+            .putString(KEY_DASHSCOPE_MODEL_ID, modelId)
+            .apply()
+    }
+
+    /**
+     * Gets the DashScope model ID.
+     *
+     * @return The model ID, or default if not set
+     */
+    fun getDashScopeModelId(): String {
+        return sharedPreferences.getString(KEY_DASHSCOPE_MODEL_ID, DEFAULT_DASHSCOPE_MODEL)
+            ?: DEFAULT_DASHSCOPE_MODEL
+    }
+
+    /**
+     * Checks if any API key is configured.
+     *
+     * @return true if at least one API key is configured
+     */
+    fun hasAnyApiKey(): Boolean {
+        return !getBigModelApiKey().isNullOrBlank() ||
+               !getDashScopeApiKey().isNullOrBlank() ||
+               !getOpenAIApiKey().isNullOrBlank() ||
+               !getCustomApiKey().isNullOrBlank()
+    }
+
+    /**
+     * Checks if the selected provider has an API key configured.
+     *
+     * @return true if the selected provider has an API key
+     */
+    fun hasSelectedProviderApiKey(): Boolean {
+        return when (getSelectedProvider()) {
+            InferenceProvider.BIGMODEL -> !getBigModelApiKey().isNullOrBlank()
+            InferenceProvider.DASHSCOPE -> !getDashScopeApiKey().isNullOrBlank()
+            InferenceProvider.OPENAI -> !getOpenAIApiKey().isNullOrBlank()
+            InferenceProvider.CUSTOM -> !getCustomApiKey().isNullOrBlank()
+        }
+    }
+
+    /**
+     * Clears all stored API keys.
+     * Use with caution - this will remove all credentials.
+     */
+    fun clearAllKeys() {
+        sharedPreferences.edit().clear().apply()
+    }
+
+    /**
+     * Clears the API key for a specific provider.
+     *
+     * @param provider The provider whose key should be cleared
+     */
+    fun clearProviderKey(provider: InferenceProvider) {
+        sharedPreferences.edit().apply {
+            when (provider) {
+                InferenceProvider.BIGMODEL -> remove(KEY_BIGMODEL_API_KEY)
+                InferenceProvider.DASHSCOPE -> remove(KEY_DASHSCOPE_API_KEY)
+                InferenceProvider.OPENAI -> remove(KEY_OPENAI_API_KEY)
+                InferenceProvider.CUSTOM -> {
+                    remove(KEY_CUSTOM_API_KEY)
+                    remove(KEY_CUSTOM_API_BASE_URL)
+                }
+            }
+        }.apply()
+    }
+
+    /**
+     * Gets configuration summary (without exposing actual keys).
+     *
+     * @return A map of provider names to whether they're configured
+     */
+    fun getConfigurationSummary(): Map<String, Boolean> {
+        return mapOf(
+            "BigModel" to !getBigModelApiKey().isNullOrBlank(),
+            "DashScope" to !getDashScopeApiKey().isNullOrBlank(),
+            "OpenAI" to !getOpenAIApiKey().isNullOrBlank(),
+            "Custom" to !getCustomApiKey().isNullOrBlank()
+        )
+    }
+}
+
+/**
+ * Enum representing supported cloud inference providers.
+ */
+enum class InferenceProvider {
+    /** BigModel/ZhipuAI provider (AutoGLM-Phone-9B) */
+    BIGMODEL,
+
+    /** DashScope/Alibaba Cloud provider (Qwen2.5-VL-72B) */
+    DASHSCOPE,
+
+    /** OpenAI-compatible provider */
+    OPENAI,
+
+    /** Custom self-hosted provider */
+    CUSTOM
+}
