@@ -1,0 +1,483 @@
+# Agent Service Internal API Contract
+# This defines the internal interfaces for the Android agent components.
+# Not a public API - used for component contracts within the app.
+
+openapi: 3.0.3
+info:
+  title: AutoGLM Agent Service
+  description: Internal service contracts for the VLM-powered Android agent
+  version: 1.0.0
+
+# Note: This is not a REST API. These contracts define the interface
+# between Kotlin components, documented in OpenAPI format for clarity.
+
+components:
+  schemas:
+    # Core Agent Types
+    Task:
+      type: object
+      required:
+        - id
+        - description
+        - status
+        - createdAt
+        - stepCount
+        - maxSteps
+        - inferenceMode
+      properties:
+        id:
+          type: string
+          format: uuid
+        description:
+          type: string
+          maxLength: 1000
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        createdAt:
+          type: integer
+          format: int64
+          description: Unix timestamp milliseconds
+        startedAt:
+          type: integer
+          format: int64
+          nullable: true
+        completedAt:
+          type: integer
+          format: int64
+          nullable: true
+        result:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        stepCount:
+          type: integer
+          minimum: 0
+        maxSteps:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 100
+        inferenceMode:
+          $ref: '#/components/schemas/InferenceMode'
+
+    TaskStatus:
+      type: string
+      enum:
+        - PENDING
+        - RUNNING
+        - PAUSED
+        - COMPLETED
+        - FAILED
+        - CANCELLED
+
+    InferenceMode:
+      type: string
+      enum:
+        - ON_DEVICE
+        - CLOUD
+        - AUTO
+
+    Action:
+      type: object
+      required:
+        - id
+        - taskId
+        - type
+        - parameters
+        - timestamp
+        - success
+      properties:
+        id:
+          type: string
+          format: uuid
+        taskId:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/ActionType'
+        parameters:
+          type: object
+          additionalProperties: true
+        timestamp:
+          type: integer
+          format: int64
+        success:
+          type: boolean
+        thinking:
+          type: string
+          maxLength: 2000
+        screenStateId:
+          type: string
+          format: uuid
+          nullable: true
+
+    ActionType:
+      type: string
+      enum:
+        - TAP
+        - DOUBLE_TAP
+        - LONG_PRESS
+        - SWIPE
+        - TYPE
+        - BACK
+        - HOME
+        - LAUNCH
+        - WAIT
+        - TAKE_OVER
+        - FINISH
+
+    ActionResult:
+      type: object
+      required:
+        - success
+        - shouldFinish
+      properties:
+        success:
+          type: boolean
+        shouldFinish:
+          type: boolean
+          default: false
+        message:
+          type: string
+          nullable: true
+        requiresConfirmation:
+          type: boolean
+          default: false
+
+    StepResult:
+      type: object
+      required:
+        - success
+        - finished
+        - thinking
+      properties:
+        success:
+          type: boolean
+        finished:
+          type: boolean
+        action:
+          $ref: '#/components/schemas/Action'
+          nullable: true
+        thinking:
+          type: string
+        message:
+          type: string
+          nullable: true
+
+    ScreenState:
+      type: object
+      required:
+        - id
+        - taskId
+        - capturedAt
+        - width
+        - height
+        - currentApp
+        - currentPackage
+      properties:
+        id:
+          type: string
+          format: uuid
+        taskId:
+          type: string
+          format: uuid
+        capturedAt:
+          type: integer
+          format: int64
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        screenshotBase64:
+          type: string
+          nullable: true
+        currentApp:
+          type: string
+        currentPackage:
+          type: string
+        uiElements:
+          type: array
+          items:
+            $ref: '#/components/schemas/UIElement'
+
+    UIElement:
+      type: object
+      required:
+        - id
+        - type
+        - bounds
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        text:
+          type: string
+          nullable: true
+        contentDescription:
+          type: string
+          nullable: true
+        bounds:
+          $ref: '#/components/schemas/Rect'
+        clickable:
+          type: boolean
+          default: false
+        scrollable:
+          type: boolean
+          default: false
+        focused:
+          type: boolean
+          default: false
+        enabled:
+          type: boolean
+          default: true
+        className:
+          type: string
+          nullable: true
+
+    Rect:
+      type: object
+      required:
+        - left
+        - top
+        - right
+        - bottom
+      properties:
+        left:
+          type: integer
+        top:
+          type: integer
+        right:
+          type: integer
+        bottom:
+          type: integer
+
+    AppMapping:
+      type: object
+      required:
+        - packageName
+        - appName
+        - category
+        - prompts
+      properties:
+        packageName:
+          type: string
+          pattern: '^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$'
+        appName:
+          type: string
+        aliases:
+          type: array
+          items:
+            type: string
+        category:
+          $ref: '#/components/schemas/AppCategory'
+        iconPath:
+          type: string
+          nullable: true
+        uiPatterns:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        prompts:
+          type: object
+          required:
+            - zh
+            - en
+          properties:
+            zh:
+              type: string
+            en:
+              type: string
+        isUserDefined:
+          type: boolean
+          default: false
+
+    AppCategory:
+      type: string
+      enum:
+        - SOCIAL
+        - ECOMMERCE
+        - TRAVEL
+        - FOOD
+        - ENTERTAINMENT
+        - PRODUCTIVITY
+        - FINANCE
+        - SYSTEM
+        - OTHER
+
+    UserPreferences:
+      type: object
+      properties:
+        id:
+          type: string
+          default: default
+        language:
+          type: string
+          enum: [zh, en]
+          default: zh
+        defaultInferenceMode:
+          $ref: '#/components/schemas/InferenceMode'
+        confirmSensitiveActions:
+          type: boolean
+          default: true
+        enabledApps:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Null means all apps enabled
+        cloudApiEnabled:
+          type: boolean
+          default: true
+        maxStepsPerTask:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 100
+        defaultPaymentMethod:
+          type: string
+          nullable: true
+        defaultDeliveryAddress:
+          type: string
+          nullable: true
+        onDeviceModelPreference:
+          type: string
+          default: qwen2.5-vl-3b
+
+# Service Interfaces (documented as paths for clarity)
+paths:
+  /agent/run:
+    post:
+      summary: Run a task to completion
+      description: |
+        Execute a task from start to finish.
+        Kotlin signature: suspend fun run(task: String): String
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - task
+              properties:
+                task:
+                  type: string
+                  description: Natural language task description
+      responses:
+        '200':
+          description: Task completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: string
+
+  /agent/step:
+    post:
+      summary: Execute a single step
+      description: |
+        Execute one step of agent loop.
+        Kotlin signature: suspend fun step(task: String? = null): StepResult
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                task:
+                  type: string
+                  nullable: true
+                  description: Task description (required for first step)
+      responses:
+        '200':
+          description: Step executed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepResult'
+
+  /agent/reset:
+    post:
+      summary: Reset agent state
+      description: |
+        Clear context for new task.
+        Kotlin signature: fun reset()
+      responses:
+        '204':
+          description: State reset
+
+  /inference/route:
+    post:
+      summary: Determine inference backend
+      description: |
+        Route inference to on-device or cloud based on task context.
+        Kotlin signature: suspend fun route(task: Task, screenState: ScreenState): InferenceMode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - task
+                - screenState
+              properties:
+                task:
+                  $ref: '#/components/schemas/Task'
+                screenState:
+                  $ref: '#/components/schemas/ScreenState'
+      responses:
+        '200':
+          description: Routing decision
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mode:
+                    $ref: '#/components/schemas/InferenceMode'
+                  reason:
+                    type: string
+
+  /accessibility/capture:
+    get:
+      summary: Capture current screen state
+      description: |
+        Get screenshot and UI tree from AccessibilityService.
+        Kotlin signature: suspend fun captureScreenState(): ScreenState
+      responses:
+        '200':
+          description: Screen state captured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreenState'
+
+  /accessibility/execute:
+    post:
+      summary: Execute action via AccessibilityService
+      description: |
+        Perform UI action.
+        Kotlin signature: suspend fun execute(action: Action): ActionResult
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Action'
+      responses:
+        '200':
+          description: Action executed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResult'
