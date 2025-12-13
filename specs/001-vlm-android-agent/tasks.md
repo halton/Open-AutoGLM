@@ -106,10 +106,10 @@
 
 ### Cloud Inference Implementation (Required for P1)
 
-- [ ] T043 [US1] Implement CloudInference client using OkHttp/Retrofit in android/app/src/main/java/com/openautoglm/agent/inference/CloudInference.kt
-- [ ] T044 [US1] Add BigModel API configuration (AutoGLM-Phone-9B) in android/app/src/main/java/com/openautoglm/agent/inference/BigModelConfig.kt
-- [ ] T045 [P] [US1] Add DashScope API configuration (Qwen2.5-VL-72B) in android/app/src/main/java/com/openautoglm/agent/inference/DashScopeConfig.kt
-- [ ] T046 [US1] Implement API key secure storage using Android Keystore in android/app/src/main/java/com/openautoglm/agent/inference/SecureKeyStorage.kt
+- [X] T043 [US1] Implement CloudInference client using OkHttp/Retrofit in android/app/src/main/java/com/openautoglm/agent/inference/CloudInference.kt
+- [X] T044 [US1] Add BigModel API configuration (AutoGLM-Phone-9B) in android/app/src/main/java/com/openautoglm/agent/inference/BigModelConfig.kt
+- [X] T045 [P] [US1] Add DashScope API configuration (Qwen2.5-VL-72B) in android/app/src/main/java/com/openautoglm/agent/inference/DashScopeConfig.kt
+- [X] T046 [US1] Implement API key secure storage using Android Keystore in android/app/src/main/java/com/openautoglm/agent/inference/SecureKeyStorage.kt
 
 ### Core Agent Implementation
 
