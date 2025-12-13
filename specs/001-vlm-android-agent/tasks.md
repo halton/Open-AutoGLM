@@ -25,12 +25,12 @@
 
 **Purpose**: Project initialization and Android project structure
 
-- [ ] T001 Create Android project structure per plan.md in android/
-- [ ] T002 Initialize Kotlin project with build.gradle.kts and Jetpack Compose dependencies in android/app/build.gradle.kts
-- [ ] T003 [P] Configure ktlint for Kotlin code formatting in android/build.gradle.kts
-- [ ] T004 [P] Create AndroidManifest.xml with required permissions (ACCESSIBILITY, INTERNET, FOREGROUND_SERVICE) in android/app/src/main/AndroidManifest.xml
-- [ ] T005 [P] Setup Room database dependencies and configuration in android/app/build.gradle.kts
-- [ ] T006 Create AutoGLMApplication.kt application class in android/app/src/main/java/com/openautoglm/agent/AutoGLMApplication.kt
+- [X] T001 Create Android project structure per plan.md in android/
+- [X] T002 Initialize Kotlin project with build.gradle.kts and Jetpack Compose dependencies in android/app/build.gradle.kts
+- [X] T003 [P] Configure ktlint for Kotlin code formatting in android/build.gradle.kts
+- [X] T004 [P] Create AndroidManifest.xml with required permissions (ACCESSIBILITY, INTERNET, FOREGROUND_SERVICE) in android/app/src/main/AndroidManifest.xml
+- [X] T005 [P] Setup Room database dependencies and configuration in android/app/build.gradle.kts
+- [X] T006 Create AutoGLMApplication.kt application class in android/app/src/main/java/com/openautoglm/agent/AutoGLMApplication.kt
 
 ---
 
@@ -42,57 +42,57 @@
 
 ### 2.1 Data Layer Foundation
 
-- [ ] T007 Create TaskStatus and InferenceMode enums in android/app/src/main/java/com/openautoglm/agent/data/entities/Enums.kt
-- [ ] T008 [P] Create Task entity with Room annotations in android/app/src/main/java/com/openautoglm/agent/data/entities/Task.kt
-- [ ] T009 [P] Create Action entity with Room annotations in android/app/src/main/java/com/openautoglm/agent/data/entities/Action.kt
-- [ ] T010 [P] Create ActionResult data class in android/app/src/main/java/com/openautoglm/agent/data/entities/ActionResult.kt
-- [ ] T011 [P] Create ScreenState data class in android/app/src/main/java/com/openautoglm/agent/data/entities/ScreenState.kt
-- [ ] T012 [P] Create UIElement data class with Rect in android/app/src/main/java/com/openautoglm/agent/data/entities/UIElement.kt
-- [ ] T013 [P] Create AppMapping entity with Room annotations in android/app/src/main/java/com/openautoglm/agent/data/entities/AppMapping.kt
-- [ ] T014 [P] Create UserPreferences entity in android/app/src/main/java/com/openautoglm/agent/data/entities/UserPreferences.kt
-- [ ] T015 [P] Create ModelConfig entity in android/app/src/main/java/com/openautoglm/agent/data/entities/ModelConfig.kt
-- [ ] T016 Create TaskDao with CRUD operations in android/app/src/main/java/com/openautoglm/agent/data/dao/TaskDao.kt
-- [ ] T017 [P] Create ActionDao in android/app/src/main/java/com/openautoglm/agent/data/dao/ActionDao.kt
-- [ ] T018 [P] Create AppMappingDao in android/app/src/main/java/com/openautoglm/agent/data/dao/AppMappingDao.kt
-- [ ] T019 [P] Create UserPreferencesDao in android/app/src/main/java/com/openautoglm/agent/data/dao/UserPreferencesDao.kt
-- [ ] T020 [P] Create ModelConfigDao in android/app/src/main/java/com/openautoglm/agent/data/dao/ModelConfigDao.kt
-- [ ] T021 Create AppDatabase with Room database definition in android/app/src/main/java/com/openautoglm/agent/data/AppDatabase.kt
-- [ ] T022 Create TaskRepository for data access abstraction in android/app/src/main/java/com/openautoglm/agent/data/TaskRepository.kt
+- [X] T007 Create TaskStatus and InferenceMode enums in android/app/src/main/java/com/openautoglm/agent/data/entities/Enums.kt
+- [X] T008 [P] Create Task entity with Room annotations in android/app/src/main/java/com/openautoglm/agent/data/entities/Task.kt
+- [X] T009 [P] Create Action entity with Room annotations in android/app/src/main/java/com/openautoglm/agent/data/entities/Action.kt
+- [X] T010 [P] Create ActionResult data class in android/app/src/main/java/com/openautoglm/agent/data/entities/ActionResult.kt
+- [X] T011 [P] Create ScreenState data class in android/app/src/main/java/com/openautoglm/agent/data/entities/ScreenState.kt
+- [X] T012 [P] Create UIElement data class with Rect in android/app/src/main/java/com/openautoglm/agent/data/entities/UIElement.kt
+- [X] T013 [P] Create AppMapping entity with Room annotations in android/app/src/main/java/com/openautoglm/agent/data/entities/AppMapping.kt
+- [X] T014 [P] Create UserPreferences entity in android/app/src/main/java/com/openautoglm/agent/data/entities/UserPreferences.kt
+- [X] T015 [P] Create ModelConfig entity in android/app/src/main/java/com/openautoglm/agent/data/entities/ModelConfig.kt
+- [X] T016 Create TaskDao with CRUD operations in android/app/src/main/java/com/openautoglm/agent/data/dao/TaskDao.kt
+- [X] T017 [P] Create ActionDao in android/app/src/main/java/com/openautoglm/agent/data/dao/ActionDao.kt
+- [X] T018 [P] Create AppMappingDao in android/app/src/main/java/com/openautoglm/agent/data/dao/AppMappingDao.kt
+- [X] T019 [P] Create UserPreferencesDao in android/app/src/main/java/com/openautoglm/agent/data/dao/UserPreferencesDao.kt
+- [X] T020 [P] Create ModelConfigDao in android/app/src/main/java/com/openautoglm/agent/data/dao/ModelConfigDao.kt
+- [X] T021 Create AppDatabase with Room database definition in android/app/src/main/java/com/openautoglm/agent/data/AppDatabase.kt
+- [X] T022 Create TaskRepository for data access abstraction in android/app/src/main/java/com/openautoglm/agent/data/AgentRepository.kt
 
 ### 2.2 Model Client Foundation (OpenAI-Compatible)
 
-- [ ] T023 Create ChatMessage data class (OpenAI format) in android/app/src/main/java/com/openautoglm/agent/model/ChatMessage.kt
-- [ ] T024 [P] Create ContentPart sealed class (text/image) in android/app/src/main/java/com/openautoglm/agent/model/ContentPart.kt
-- [ ] T025 [P] Create ChatCompletionRequest data class in android/app/src/main/java/com/openautoglm/agent/model/ChatCompletionRequest.kt
-- [ ] T026 [P] Create ChatCompletionResponse data class in android/app/src/main/java/com/openautoglm/agent/model/ChatCompletionResponse.kt
-- [ ] T027 Create ModelResponse data class with thinking/action parsing in android/app/src/main/java/com/openautoglm/agent/model/ModelResponse.kt
-- [ ] T028 Create ModelClient interface in android/app/src/main/java/com/openautoglm/agent/model/ModelClient.kt
+- [X] T023 Create ChatMessage data class (OpenAI format) in android/app/src/main/java/com/openautoglm/agent/model/ChatMessage.kt
+- [X] T024 [P] Create ContentPart sealed class (text/image) in android/app/src/main/java/com/openautoglm/agent/model/ChatMessage.kt
+- [X] T025 [P] Create ChatCompletionRequest data class in android/app/src/main/java/com/openautoglm/agent/model/ChatCompletionRequest.kt
+- [X] T026 [P] Create ChatCompletionResponse data class in android/app/src/main/java/com/openautoglm/agent/model/ChatCompletionResponse.kt
+- [X] T027 Create ModelResponse data class with thinking/action parsing in android/app/src/main/java/com/openautoglm/agent/model/ModelResponse.kt
+- [X] T028 Create ModelClient interface in android/app/src/main/java/com/openautoglm/agent/model/ModelClient.kt
 
 ### 2.3 Accessibility Service Foundation
 
-- [ ] T029 Create AutoGLMAccessibilityService extending AccessibilityService in android/app/src/main/java/com/openautoglm/agent/accessibility/AutoGLMAccessibilityService.kt
-- [ ] T030 Create UIElementParser for parsing accessibility node tree in android/app/src/main/java/com/openautoglm/agent/accessibility/UIElementParser.kt
-- [ ] T031 Create ScreenCaptureManager using MediaProjection API in android/app/src/main/java/com/openautoglm/agent/accessibility/ScreenCaptureManager.kt
+- [X] T029 Create AutoGLMAccessibilityService extending AccessibilityService in android/app/src/main/java/com/openautoglm/agent/accessibility/AutoGLMAccessibilityService.kt
+- [X] T030 Create UIElementParser for parsing accessibility node tree in android/app/src/main/java/com/openautoglm/agent/accessibility/UIElementParser.kt
+- [X] T031 Create ScreenCaptureManager using MediaProjection API in android/app/src/main/java/com/openautoglm/agent/accessibility/ScreenCaptureManager.kt
 
 ### 2.4 App Knowledge Base Foundation
 
-- [ ] T032 Port app mappings from phone_agent/config/apps.py to JSON format in android/app/src/main/assets/app_mappings.json
-- [ ] T033 Create AppRegistry for loading and querying app mappings in android/app/src/main/java/com/openautoglm/agent/knowledge/AppRegistry.kt
-- [ ] T034 Create AppMappings utility for app name resolution in android/app/src/main/java/com/openautoglm/agent/knowledge/AppMappings.kt
+- [X] T032 Port app mappings from phone_agent/config/apps.py to JSON format in android/app/src/main/assets/app_mappings.json
+- [X] T033 Create AppRegistry for loading and querying app mappings in android/app/src/main/java/com/openautoglm/agent/knowledge/AppKnowledgeBase.kt
+- [X] T034 Create AppMappings utility for app name resolution in android/app/src/main/java/com/openautoglm/agent/knowledge/DefaultAppMappings.kt
 
 ### 2.5 Inference Router Foundation
 
-- [ ] T035 Create InferenceRouter interface in android/app/src/main/java/com/openautoglm/agent/inference/InferenceRouter.kt
-- [ ] T036 Create complexity scoring logic for task routing in android/app/src/main/java/com/openautoglm/agent/inference/ComplexityScorer.kt
+- [X] T035 Create InferenceRouter interface in android/app/src/main/java/com/openautoglm/agent/model/InferenceRouter.kt
+- [X] T036 Create complexity scoring logic for task routing in android/app/src/main/java/com/openautoglm/agent/inference/ComplexityScorer.kt
 
 ### 2.6 Agent Core Foundation
 
-- [ ] T037 Port system prompts from phone_agent/config/prompts.py to Kotlin in android/app/src/main/java/com/openautoglm/agent/agent/SystemPrompts.kt
-- [ ] T038 [P] Port prompts_en.py to Kotlin in android/app/src/main/java/com/openautoglm/agent/agent/PromptsEn.kt
-- [ ] T039 [P] Port prompts_zh.py to Kotlin in android/app/src/main/java/com/openautoglm/agent/agent/PromptsZh.kt
-- [ ] T040 Create AgentConfig data class in android/app/src/main/java/com/openautoglm/agent/agent/AgentConfig.kt
-- [ ] T041 Create ActionHandler interface in android/app/src/main/java/com/openautoglm/agent/actions/ActionHandler.kt
-- [ ] T042 Create ActionParser for parsing model output to Action in android/app/src/main/java/com/openautoglm/agent/actions/ActionParser.kt
+- [X] T037 Port system prompts from phone_agent/config/prompts.py to Kotlin in android/app/src/main/java/com/openautoglm/agent/knowledge/PromptTemplates.kt
+- [X] T038 [P] Port prompts_en.py to Kotlin in android/app/src/main/java/com/openautoglm/agent/knowledge/PromptTemplates.kt
+- [X] T039 [P] Port prompts_zh.py to Kotlin in android/app/src/main/java/com/openautoglm/agent/knowledge/PromptTemplates.kt
+- [X] T040 Create AgentConfig data class in android/app/src/main/java/com/openautoglm/agent/agent/AgentConfig.kt
+- [X] T041 Create ActionHandler interface in android/app/src/main/java/com/openautoglm/agent/actions/ActionHandler.kt
+- [X] T042 Create ActionParser for parsing model output to Action in android/app/src/main/java/com/openautoglm/agent/core/ResponseParser.kt
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 

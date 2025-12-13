@@ -1,0 +1,5 @@
+{
+  "version": "1.0",
+  "description": "External app mappings for user-customizable app knowledge base. Loaded on top of default mappings from DefaultAppMappings.kt",
+  "mappings": []
+}

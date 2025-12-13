@@ -55,7 +55,7 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- Foreground Service for task execution -->
+        <!-- Foreground Service for task execution (legacy) -->
         <service
             android:name=".agent.TaskExecutionService"
             android:exported="false"
@@ -63,6 +63,16 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="AI-powered task automation" />
+        </service>
+
+        <!-- Agent Service for hosting agent execution loop -->
+        <service
+            android:name=".agent.service.AgentService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse|mediaProjection">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="AI-powered task automation agent" />
         </service>
 
     </application>
