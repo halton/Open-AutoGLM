@@ -1,0 +1,393 @@
+# Model Client API Contract
+# Defines the interface for model inference (both on-device and cloud).
+# Cloud APIs are OpenAI-compatible.
+
+openapi: 3.0.3
+info:
+  title: AutoGLM Model Client
+  description: |
+    Model inference contracts for the VLM-powered Android agent.
+    Cloud APIs follow OpenAI Chat Completions format.
+    On-device inference uses the same message format internally.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000/v1
+    description: Local model server (vLLM/SGLang)
+  - url: https://open.bigmodel.cn/api/paas/v4
+    description: BigModel API (AutoGLM-Phone-9B)
+  - url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    description: Alibaba Cloud DashScope (Qwen2.5-VL-72B)
+
+components:
+  schemas:
+    ModelConfig:
+      type: object
+      required:
+        - modelName
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [ON_DEVICE, CLOUD]
+        modelName:
+          type: string
+          examples:
+            - autoglm-phone-9b
+            - qwen2.5-vl-3b
+            - qwen2.5-vl-72b
+        baseUrl:
+          type: string
+          format: uri
+          description: Required for cloud inference
+        apiKey:
+          type: string
+          description: Required for cloud inference (stored encrypted)
+        maxTokens:
+          type: integer
+          default: 3000
+          minimum: 1
+          maximum: 8192
+        temperature:
+          type: number
+          default: 0.0
+          minimum: 0.0
+          maximum: 2.0
+        topP:
+          type: number
+          default: 0.85
+          minimum: 0.0
+          maximum: 1.0
+        frequencyPenalty:
+          type: number
+          default: 0.2
+          minimum: -2.0
+          maximum: 2.0
+
+    ChatMessage:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant]
+        content:
+          oneOf:
+            - type: string
+              description: Text-only content
+            - type: array
+              description: Multimodal content (text + images)
+              items:
+                $ref: '#/components/schemas/ContentPart'
+
+    ContentPart:
+      oneOf:
+        - $ref: '#/components/schemas/TextContent'
+        - $ref: '#/components/schemas/ImageContent'
+
+    TextContent:
+      type: object
+      required:
+        - type
+        - text
+      properties:
+        type:
+          type: string
+          const: text
+        text:
+          type: string
+
+    ImageContent:
+      type: object
+      required:
+        - type
+        - image_url
+      properties:
+        type:
+          type: string
+          const: image_url
+        image_url:
+          type: object
+          required:
+            - url
+          properties:
+            url:
+              type: string
+              description: |
+                Either a URL or base64-encoded image.
+                Format: data:image/png;base64,{base64_data}
+
+    ChatCompletionRequest:
+      type: object
+      required:
+        - model
+        - messages
+      properties:
+        model:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+        max_tokens:
+          type: integer
+          default: 3000
+        temperature:
+          type: number
+          default: 0.0
+        top_p:
+          type: number
+          default: 0.85
+        frequency_penalty:
+          type: number
+          default: 0.2
+        stream:
+          type: boolean
+          default: false
+
+    ChatCompletionResponse:
+      type: object
+      required:
+        - id
+        - object
+        - created
+        - model
+        - choices
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          const: chat.completion
+        created:
+          type: integer
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/Choice'
+        usage:
+          $ref: '#/components/schemas/Usage'
+
+    Choice:
+      type: object
+      required:
+        - index
+        - message
+        - finish_reason
+      properties:
+        index:
+          type: integer
+        message:
+          $ref: '#/components/schemas/ChatMessage'
+        finish_reason:
+          type: string
+          enum: [stop, length, content_filter]
+
+    Usage:
+      type: object
+      properties:
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        total_tokens:
+          type: integer
+
+    ModelResponse:
+      type: object
+      description: Parsed response from model inference
+      required:
+        - thinking
+        - action
+        - rawContent
+      properties:
+        thinking:
+          type: string
+          maxLength: 2000
+          description: Agent's reasoning process
+        action:
+          type: string
+          description: Raw action string (e.g., "do(action=Tap, element=[500,800])")
+        rawContent:
+          type: string
+          description: Full model response
+        inferenceTimeMs:
+          type: integer
+          description: Inference duration in milliseconds
+        modelUsed:
+          type: string
+          description: Which model was used
+        tokenCount:
+          type: integer
+          nullable: true
+          description: Tokens consumed
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: API key for cloud inference
+
+security:
+  - bearerAuth: []
+
+paths:
+  /chat/completions:
+    post:
+      summary: Chat completion (OpenAI-compatible)
+      description: |
+        Send messages to the model and get a response.
+        This is the primary inference endpoint, compatible with OpenAI API format.
+
+        For AutoGLM phone agent models, the response follows this format:
+        - Thinking section: reasoning about the current screen and task
+        - Action section: do(action=ActionType, ...) or finish(message="...")
+
+        Parsing rules:
+        1. If content contains 'finish(message=', split there
+        2. If content contains 'do(action=', split there
+        3. Fallback to <think>...</think><answer>...</answer> format
+      operationId: createChatCompletion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCompletionRequest'
+            examples:
+              phone_agent_request:
+                summary: Phone agent inference request
+                value:
+                  model: autoglm-phone-9b
+                  messages:
+                    - role: system
+                      content: "You are a phone agent that helps users complete tasks..."
+                    - role: user
+                      content:
+                        - type: image_url
+                          image_url:
+                            url: "data:image/png;base64,iVBORw0KGgo..."
+                        - type: text
+                          text: |
+                            Open WeChat and send a message to John.
+
+                            {"current_app": "System Home"}
+                  max_tokens: 3000
+                  temperature: 0.0
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatCompletionResponse'
+              examples:
+                phone_agent_response:
+                  summary: Phone agent inference response
+                  value:
+                    id: chatcmpl-123
+                    object: chat.completion
+                    created: 1702459200
+                    model: autoglm-phone-9b
+                    choices:
+                      - index: 0
+                        message:
+                          role: assistant
+                          content: |
+                            I need to open WeChat first. The home screen shows app icons.
+                            I can see the WeChat icon in the middle of the screen.
+
+                            do(action=Tap, element=[500, 800], message="Tapping WeChat icon")
+                        finish_reason: stop
+                    usage:
+                      prompt_tokens: 1500
+                      completion_tokens: 150
+                      total_tokens: 1650
+        '401':
+          description: Unauthorized (invalid API key)
+        '429':
+          description: Rate limit exceeded
+        '500':
+          description: Server error
+
+# Internal Service Interfaces
+x-internal-interfaces:
+  ModelClient:
+    description: |
+      Kotlin interface for model inference.
+
+      ```kotlin
+      interface ModelClient {
+          suspend fun request(messages: List<ChatMessage>): ModelResponse
+      }
+      ```
+    methods:
+      request:
+        parameters:
+          - name: messages
+            type: List<ChatMessage>
+        returns: ModelResponse
+
+  InferenceRouter:
+    description: |
+      Routes inference to appropriate backend.
+
+      ```kotlin
+      interface InferenceRouter {
+          suspend fun infer(
+              messages: List<ChatMessage>,
+              task: Task,
+              screenState: ScreenState
+          ): ModelResponse
+
+          fun determineMode(
+              task: Task,
+              screenState: ScreenState
+          ): InferenceMode
+      }
+      ```
+    methods:
+      infer:
+        parameters:
+          - name: messages
+            type: List<ChatMessage>
+          - name: task
+            type: Task
+          - name: screenState
+            type: ScreenState
+        returns: ModelResponse
+      determineMode:
+        parameters:
+          - name: task
+            type: Task
+          - name: screenState
+            type: ScreenState
+        returns: InferenceMode
+
+  OnDeviceInference:
+    description: |
+      On-device model inference via MLC-LLM or llama.cpp.
+
+      ```kotlin
+      interface OnDeviceInference {
+          suspend fun loadModel(modelPath: String): Boolean
+          suspend fun infer(messages: List<ChatMessage>): ModelResponse
+          fun isModelLoaded(): Boolean
+          fun unloadModel()
+      }
+      ```
+
+  CloudInference:
+    description: |
+      Cloud model inference via OpenAI-compatible APIs.
+
+      ```kotlin
+      interface CloudInference : ModelClient {
+          suspend fun request(messages: List<ChatMessage>): ModelResponse
+      }
+      ```
