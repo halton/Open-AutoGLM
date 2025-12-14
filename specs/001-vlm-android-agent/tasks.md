@@ -113,9 +113,9 @@
 
 ### Core Agent Implementation
 
-- [ ] T047 [US1] Port PhoneAgent.run() and PhoneAgent.step() from phone_agent/agent.py to android/app/src/main/java/com/openautoglm/agent/agent/PhoneAgent.kt
-- [ ] T048 [US1] Implement TaskPlanner for multi-step task orchestration in android/app/src/main/java/com/openautoglm/agent/agent/TaskPlanner.kt
-- [ ] T049 [US1] Implement action execution via AccessibilityService (TAP, SWIPE, TYPE, BACK, HOME, LAUNCH) in android/app/src/main/java/com/openautoglm/agent/actions/ActionExecutor.kt
+- [X] T047 [US1] Port PhoneAgent.run() and PhoneAgent.step() from phone_agent/agent.py to android/app/src/main/java/com/openautoglm/agent/agent/PhoneAgent.kt
+- [X] T048 [US1] Implement TaskPlanner for multi-step task orchestration in android/app/src/main/java/com/openautoglm/agent/agent/TaskPlanner.kt
+- [X] T049 [US1] Implement action execution via AccessibilityService (TAP, SWIPE, TYPE, BACK, HOME, LAUNCH) in android/app/src/main/java/com/openautoglm/agent/core/ActionExecutor.kt
 
 ### Action Handlers
 
