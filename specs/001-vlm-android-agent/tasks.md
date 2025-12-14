@@ -133,11 +133,11 @@
 
 ### UI Implementation
 
-- [ ] T058 [US1] Create MainActivity with Compose navigation in android/app/src/main/java/com/openautoglm/agent/ui/MainActivity.kt
-- [ ] T059 [US1] Create TaskScreen for task input and progress display in android/app/src/main/java/com/openautoglm/agent/ui/screens/TaskScreen.kt
-- [ ] T060 [P] [US1] Create TaskProgressComponent showing real-time agent status in android/app/src/main/java/com/openautoglm/agent/ui/components/TaskProgressComponent.kt
-- [ ] T061 [P] [US1] Create PriceComparisonCard component for displaying results in android/app/src/main/java/com/openautoglm/agent/ui/components/PriceComparisonCard.kt
-- [ ] T062 [US1] Create ConfirmationDialog for purchase confirmation (FR-007) in android/app/src/main/java/com/openautoglm/agent/ui/components/ConfirmationDialog.kt
+- [X] T058 [US1] Create MainActivity with Compose navigation in android/app/src/main/java/com/openautoglm/agent/ui/MainActivity.kt
+- [X] T059 [US1] Create TaskScreen for task input and progress display in android/app/src/main/java/com/openautoglm/agent/ui/screens/TaskScreen.kt
+- [X] T060 [P] [US1] Create TaskProgressComponent showing real-time agent status in android/app/src/main/java/com/openautoglm/agent/ui/components/TaskProgressComponent.kt
+- [X] T061 [P] [US1] Create PriceComparisonCard component for displaying results in android/app/src/main/java/com/openautoglm/agent/ui/components/PriceComparisonCard.kt
+- [X] T062 [US1] Create ConfirmationDialog for purchase confirmation (FR-007) in android/app/src/main/java/com/openautoglm/agent/ui/components/ConfirmationDialog.kt
 
 ### Error Handling for US1
 
