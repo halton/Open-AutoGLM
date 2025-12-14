@@ -122,6 +122,7 @@ object ResponseParser {
             "launch" -> ActionType.LAUNCH
             "wait" -> ActionType.WAIT
             "take over", "takeover" -> ActionType.TAKE_OVER
+            "enter", "press enter", "submit", "search" -> ActionType.ENTER
             "finish" -> ActionType.FINISH
             else -> null
         }
@@ -349,7 +350,7 @@ object ResponseParser {
                 }
             }
 
-            ActionType.BACK, ActionType.HOME -> {
+            ActionType.BACK, ActionType.HOME, ActionType.ENTER -> {
                 emptyMap()
             }
 

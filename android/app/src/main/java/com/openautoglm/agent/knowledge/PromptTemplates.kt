@@ -38,6 +38,7 @@ object PromptTemplates {
         const val HOME = """do(action="Home")"""
         const val WAIT = """do(action="Wait", duration="x seconds")"""
         const val TAKE_OVER = """do(action="Take_over", message="xxx")"""
+        const val ENTER = """do(action="Enter")"""
         const val INTERACT = """do(action="Interact")"""
         const val NOTE = """do(action="Note", message="True")"""
         const val CALL_API = """do(action="Call_API", instruction="xxx")"""
@@ -69,6 +70,7 @@ object PromptTemplates {
             ActionType.LAUNCH -> "Launch"
             ActionType.WAIT -> "Wait"
             ActionType.TAKE_OVER -> "Take_over"
+            ActionType.ENTER -> "Enter"
             ActionType.FINISH -> "finish"
         }
     }
@@ -249,6 +251,13 @@ Your output should STRICTLY follow the format:
   do(action="Wait", duration="3 seconds")
   </answer>
 
+- **Enter**
+  Press Enter/Submit to confirm input, submit search queries, or send messages. Use this after typing text in a search box or input field to submit.
+  **Example**:
+  <answer>
+  do(action="Enter")
+  </answer>
+
 - **Take Over**
   Request user assistance, typically for login or verification steps.
   **Example**:
@@ -326,6 +335,8 @@ REMEMBER:
     Home是回到系统桌面的操作，相当于按下 Android 主屏幕按钮。使用此操作可退出当前应用并返回启动器，或从已知状态启动新任务。此操作完成后，您将自动收到结果状态的截图。
 - do(action="Wait", duration="x seconds")
     等待页面加载，x为需要等待多少秒。
+- do(action="Enter")
+    Enter是确认输入操作，在输入框输入文本后按回车/搜索键提交。在搜索框输入后使用此操作来提交搜索，或在聊天输入框中发送消息。
 - finish(message="xxx")
     finish是结束任务的操作，表示准确完整完成任务，message是终止信息。
 
@@ -376,6 +387,7 @@ Output format:
 Actions (coordinates 0-999):
 - do(action="Tap", element=[x,y]) - tap at position
 - do(action="Type", text="...") - type text (auto-clears field)
+- do(action="Enter") - press Enter/submit after typing
 - do(action="Swipe", start=[x1,y1], end=[x2,y2]) - swipe gesture
 - do(action="Long Press", element=[x,y]) - long press
 - do(action="Launch", app="...") - launch app
@@ -399,6 +411,7 @@ One action per response. Verify actions succeed before continuing."""
 操作指令 (坐标范围 0-999):
 - do(action="Tap", element=[x,y]) - 点击
 - do(action="Type", text="...") - 输入文本（自动清除原文本）
+- do(action="Enter") - 输入后按回车提交
 - do(action="Swipe", start=[x1,y1], end=[x2,y2]) - 滑动
 - do(action="Long Press", element=[x,y]) - 长按
 - do(action="Launch", app="...") - 启动应用
