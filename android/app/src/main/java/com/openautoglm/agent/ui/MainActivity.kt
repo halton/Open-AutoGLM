@@ -233,16 +233,16 @@ enum class Screen(
     Tasks(
         route = "tasks",
         iconRes = android.R.drawable.ic_menu_add,
-        labelRes = android.R.string.ok  // TODO: Add proper string resources
+        labelRes = R.string.tab_tasks
     ),
     History(
         route = "history",
         iconRes = android.R.drawable.ic_menu_recent_history,
-        labelRes = android.R.string.ok  // TODO: Add proper string resources
+        labelRes = R.string.tab_history
     ),
     Settings(
         route = "settings",
         iconRes = android.R.drawable.ic_menu_preferences,
-        labelRes = android.R.string.ok  // TODO: Add proper string resources
+        labelRes = R.string.tab_settings
     )
 }

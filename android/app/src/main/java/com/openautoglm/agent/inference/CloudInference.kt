@@ -1,9 +1,12 @@
 package com.openautoglm.agent.inference
 
 import android.content.Context
+import android.util.Log
 import com.openautoglm.agent.model.ChatCompletionRequest
 import com.openautoglm.agent.model.ChatCompletionResponse
 import com.openautoglm.agent.model.ChatMessage
+import com.openautoglm.agent.model.ContentPart
+import com.openautoglm.agent.model.MessageContent
 import com.openautoglm.agent.model.ModelClient
 import com.openautoglm.agent.model.ModelResponse
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +58,7 @@ class CloudInference(
         .build()
 
     companion object {
+        private const val TAG = "CloudInference"
         private const val MEDIA_TYPE_JSON = "application/json; charset=utf-8"
     }
 
@@ -142,10 +146,32 @@ class CloudInference(
     ): ChatCompletionResponse = withContext(Dispatchers.IO) {
         val requestBody = json.encodeToString(request)
 
-        // Log the request for debugging
-        android.util.Log.d("CloudInference", "=== API Request to $provider ===")
-        android.util.Log.d("CloudInference", "URL: $url")
-        android.util.Log.d("CloudInference", "Request Body: $requestBody")
+        // Log the request for debugging (without full base64 images)
+        Log.i(TAG, "========================================")
+        Log.i(TAG, "=== API REQUEST to $provider ===")
+        Log.i(TAG, "URL: $url")
+        Log.i(TAG, "Model: ${request.model}")
+        Log.i(TAG, "Messages:")
+        request.messages.forEachIndexed { index, msg ->
+            Log.i(TAG, "  [$index] Role: ${msg.role}")
+            val contentText = msg.content.asText()
+            // Truncate long content for readability
+            val truncatedContent = if (contentText.length > 500) {
+                contentText.take(500) + "... [truncated, total ${contentText.length} chars]"
+            } else {
+                contentText
+            }
+            Log.i(TAG, "  [$index] Content: $truncatedContent")
+            // Check if message has images
+            if (msg.content is MessageContent.Parts) {
+                val parts = (msg.content as MessageContent.Parts).parts
+                val imageCount = parts.count { it is ContentPart.ImageUrlPart }
+                if (imageCount > 0) {
+                    Log.i(TAG, "  [$index] Images: $imageCount image(s) attached")
+                }
+            }
+        }
+        Log.i(TAG, "Request body size: ${requestBody.length} bytes")
 
         val requestBodyData = requestBody.toRequestBody(MEDIA_TYPE_JSON.toMediaType())
 
@@ -166,20 +192,33 @@ class CloudInference(
             .build()
 
         try {
+            val startTime = System.currentTimeMillis()
             val response = httpClient.newCall(httpRequest).execute()
+            val duration = System.currentTimeMillis() - startTime
+
+            Log.i(TAG, "=== API RESPONSE from $provider ===")
+            Log.i(TAG, "Status: ${response.code}")
+            Log.i(TAG, "Duration: ${duration}ms")
 
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: "Unknown error"
+                Log.e(TAG, "Error response: $errorBody")
                 throw IOException("API request failed (${response.code}): $errorBody")
             }
 
             val responseBody = response.body?.string()
                 ?: throw IOException("Empty response body")
 
+            Log.i(TAG, "Response body size: ${responseBody.length} bytes")
+            Log.i(TAG, "Response: $responseBody")
+            Log.i(TAG, "========================================")
+
             json.decodeFromString<ChatCompletionResponse>(responseBody)
         } catch (e: IOException) {
+            Log.e(TAG, "Network error: ${e.message}")
             throw IOException("Network error: ${e.message}", e)
         } catch (e: Exception) {
+            Log.e(TAG, "Parse error: ${e.message}")
             throw IOException("Failed to parse response: ${e.message}", e)
         }
     }
@@ -201,11 +240,20 @@ class CloudInference(
 
         val content = messageContent.asText()
 
-        // Log response for debugging
-        android.util.Log.d("CloudInference", "=== Model Response ===")
-        android.util.Log.d("CloudInference", "Raw content: $content")
-
         val (thinking, action) = parseThinkingAndAction(content)
+
+        // Log parsed response
+        Log.i(TAG, "=== PARSED RESPONSE ===")
+        if (thinking.isNotEmpty()) {
+            val truncatedThinking = if (thinking.length > 300) {
+                thinking.take(300) + "... [truncated]"
+            } else {
+                thinking
+            }
+            Log.i(TAG, "Thinking: $truncatedThinking")
+        }
+        Log.i(TAG, "Action: $action")
+        Log.i(TAG, "========================================")
 
         return ModelResponse(
             thinking = thinking,

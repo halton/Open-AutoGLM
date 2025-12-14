@@ -54,6 +54,8 @@ enum class ActionType {
     WAIT,
     /** Request user intervention */
     TAKE_OVER,
+    /** Press Enter/IME action (submit search, send message, etc.) */
+    ENTER,
     /** Complete task with message */
     FINISH
 }

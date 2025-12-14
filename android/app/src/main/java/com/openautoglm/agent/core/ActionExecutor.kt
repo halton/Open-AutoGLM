@@ -2,6 +2,8 @@ package com.openautoglm.agent.core
 
 import android.content.Context
 import android.content.Intent
+import android.util.DisplayMetrics
+import android.view.WindowManager
 import com.openautoglm.agent.accessibility.AutoGLMAccessibilityService
 import com.openautoglm.agent.data.entities.Action
 import com.openautoglm.agent.data.entities.ActionResult
@@ -27,6 +29,37 @@ class ActionExecutor(private val context: Context) {
         private const val DEFAULT_SWIPE_DURATION_MS = 300L
         private const val LONG_PRESS_DURATION_MS = 1000L
         private const val DOUBLE_TAP_DELAY_MS = 100L
+
+        // VLM model outputs coordinates in normalized range 0-999
+        private const val NORMALIZED_COORDINATE_MAX = 999
+    }
+
+    // Cached screen dimensions
+    private var screenWidth: Int = 0
+    private var screenHeight: Int = 0
+
+    init {
+        // Get screen dimensions
+        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val displayMetrics = DisplayMetrics()
+        @Suppress("DEPRECATION")
+        windowManager.defaultDisplay.getMetrics(displayMetrics)
+        screenWidth = displayMetrics.widthPixels
+        screenHeight = displayMetrics.heightPixels
+        android.util.Log.i("ActionExecutor", "Screen dimensions: ${screenWidth}x${screenHeight}")
+    }
+
+    /**
+     * Converts normalized coordinates (0-999) to actual screen pixels.
+     *
+     * @param normalizedX Normalized X coordinate (0-999)
+     * @param normalizedY Normalized Y coordinate (0-999)
+     * @return Pair of actual (x, y) screen coordinates in pixels
+     */
+    private fun normalizedToScreenCoordinates(normalizedX: Int, normalizedY: Int): Pair<Int, Int> {
+        val actualX = (normalizedX * screenWidth) / NORMALIZED_COORDINATE_MAX
+        val actualY = (normalizedY * screenHeight) / NORMALIZED_COORDINATE_MAX
+        return Pair(actualX, actualY)
     }
 
     /**
@@ -49,6 +82,7 @@ class ActionExecutor(private val context: Context) {
             ActionType.LAUNCH -> executeLaunchAppFromAction(action)
             ActionType.WAIT -> executeWaitFromAction(action)
             ActionType.TAKE_OVER -> executeTakeOver(action)
+            ActionType.ENTER -> executeEnter()
             ActionType.FINISH -> executeFinish(action)
         }
 
@@ -69,10 +103,18 @@ class ActionExecutor(private val context: Context) {
      * @return ActionResult indicating success or failure
      */
     suspend fun executeTap(x: Int, y: Int): ActionResult {
-        val service = getAccessibilityService()
-            ?: return ActionResult.failure(message = "AccessibilityService not available")
+        android.util.Log.i("ActionExecutor", "executeTap called: ($x, $y)")
 
+        val service = getAccessibilityService()
+        if (service == null) {
+            android.util.Log.e("ActionExecutor", "AccessibilityService not available!")
+            return ActionResult.failure(message = "AccessibilityService not available")
+        }
+
+        android.util.Log.i("ActionExecutor", "Calling performTap...")
         val success = service.performTap(x, y)
+        android.util.Log.i("ActionExecutor", "performTap returned: $success")
+
         delay(DEFAULT_WAIT_AFTER_ACTION_MS)
 
         return if (success) {
@@ -184,6 +226,25 @@ class ActionExecutor(private val context: Context) {
     }
 
     /**
+     * Performs an Enter/IME action (submit search, send message, etc.).
+     *
+     * @return ActionResult indicating success or failure
+     */
+    suspend fun executeEnter(): ActionResult {
+        val service = getAccessibilityService()
+            ?: return ActionResult.failure(message = "AccessibilityService not available")
+
+        val success = service.performEnter()
+        delay(DEFAULT_WAIT_AFTER_ACTION_MS)
+
+        return if (success) {
+            ActionResult.success(message = "Performed Enter/Submit action")
+        } else {
+            ActionResult.failure(message = "Failed to perform Enter action")
+        }
+    }
+
+    /**
      * Launches an application by its package name.
      *
      * @param packageName The package name of the app to launch
@@ -274,47 +335,64 @@ class ActionExecutor(private val context: Context) {
     // Private helper methods for parsing action parameters
 
     private suspend fun executeTapFromAction(action: Action): ActionResult {
-        val x = action.parameters.getIntParam("x")
+        val normalizedX = action.parameters.getIntParam("x")
             ?: return ActionResult.failure(message = "Missing 'x' parameter for TAP action")
-        val y = action.parameters.getIntParam("y")
+        val normalizedY = action.parameters.getIntParam("y")
             ?: return ActionResult.failure(message = "Missing 'y' parameter for TAP action")
+
+        // Convert normalized coordinates (0-999) to actual screen pixels
+        val (x, y) = normalizedToScreenCoordinates(normalizedX, normalizedY)
+        android.util.Log.i("ActionExecutor", "TAP: normalized ($normalizedX, $normalizedY) -> screen ($x, $y)")
 
         return executeTap(x, y)
     }
 
     private suspend fun executeDoubleTapFromAction(action: Action): ActionResult {
-        val x = action.parameters.getIntParam("x")
+        val normalizedX = action.parameters.getIntParam("x")
             ?: return ActionResult.failure(message = "Missing 'x' parameter for DOUBLE_TAP action")
-        val y = action.parameters.getIntParam("y")
+        val normalizedY = action.parameters.getIntParam("y")
             ?: return ActionResult.failure(message = "Missing 'y' parameter for DOUBLE_TAP action")
+
+        // Convert normalized coordinates (0-999) to actual screen pixels
+        val (x, y) = normalizedToScreenCoordinates(normalizedX, normalizedY)
+        android.util.Log.i("ActionExecutor", "DOUBLE_TAP: normalized ($normalizedX, $normalizedY) -> screen ($x, $y)")
 
         return executeDoubleTap(x, y)
     }
 
     private suspend fun executeLongPressFromAction(action: Action): ActionResult {
-        val x = action.parameters.getIntParam("x")
+        val normalizedX = action.parameters.getIntParam("x")
             ?: return ActionResult.failure(message = "Missing 'x' parameter for LONG_PRESS action")
-        val y = action.parameters.getIntParam("y")
+        val normalizedY = action.parameters.getIntParam("y")
             ?: return ActionResult.failure(message = "Missing 'y' parameter for LONG_PRESS action")
         val duration = action.parameters.getLongParam("duration") ?: LONG_PRESS_DURATION_MS
+
+        // Convert normalized coordinates (0-999) to actual screen pixels
+        val (x, y) = normalizedToScreenCoordinates(normalizedX, normalizedY)
+        android.util.Log.i("ActionExecutor", "LONG_PRESS: normalized ($normalizedX, $normalizedY) -> screen ($x, $y)")
 
         return executeLongPress(x, y, duration)
     }
 
     private suspend fun executeSwipeFromAction(action: Action): ActionResult {
-        val startX = action.parameters.getIntParam("startX")
+        val normalizedStartX = action.parameters.getIntParam("startX")
             ?: action.parameters.getIntParam("start_x")
             ?: return ActionResult.failure(message = "Missing 'startX' parameter for SWIPE action")
-        val startY = action.parameters.getIntParam("startY")
+        val normalizedStartY = action.parameters.getIntParam("startY")
             ?: action.parameters.getIntParam("start_y")
             ?: return ActionResult.failure(message = "Missing 'startY' parameter for SWIPE action")
-        val endX = action.parameters.getIntParam("endX")
+        val normalizedEndX = action.parameters.getIntParam("endX")
             ?: action.parameters.getIntParam("end_x")
             ?: return ActionResult.failure(message = "Missing 'endX' parameter for SWIPE action")
-        val endY = action.parameters.getIntParam("endY")
+        val normalizedEndY = action.parameters.getIntParam("endY")
             ?: action.parameters.getIntParam("end_y")
             ?: return ActionResult.failure(message = "Missing 'endY' parameter for SWIPE action")
         val duration = action.parameters.getLongParam("duration") ?: DEFAULT_SWIPE_DURATION_MS
+
+        // Convert normalized coordinates (0-999) to actual screen pixels
+        val (startX, startY) = normalizedToScreenCoordinates(normalizedStartX, normalizedStartY)
+        val (endX, endY) = normalizedToScreenCoordinates(normalizedEndX, normalizedEndY)
+        android.util.Log.i("ActionExecutor", "SWIPE: normalized ($normalizedStartX, $normalizedStartY) -> ($normalizedEndX, $normalizedEndY) => screen ($startX, $startY) -> ($endX, $endY)")
 
         return executeSwipe(startX, startY, endX, endY, duration)
     }
