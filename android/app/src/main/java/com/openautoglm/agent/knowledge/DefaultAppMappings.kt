@@ -174,6 +174,36 @@ object DefaultAppMappings {
                 aliases = listOf("temu")
             )
         )
+        add(
+            AppMapping.create(
+                packageName = "com.amazon.mShop.android.shopping",
+                appName = "Amazon",
+                category = AppCategory.ECOMMERCE,
+                zhPrompt = "亚马逊是全球领先的跨境电商平台，提供海量商品和Prime会员服务",
+                enPrompt = "Amazon is a global e-commerce platform with vast product selection and Prime membership",
+                aliases = listOf("亚马逊", "amazon", "Amazon Shopping")
+            )
+        )
+        add(
+            AppMapping.create(
+                packageName = "com.contextlogic.wish",
+                appName = "Wish",
+                category = AppCategory.ECOMMERCE,
+                zhPrompt = "Wish是国际折扣购物平台",
+                enPrompt = "Wish is an international discount shopping platform",
+                aliases = listOf("wish")
+            )
+        )
+        add(
+            AppMapping.create(
+                packageName = "com.alibaba.intl.android.apps.poseidon",
+                appName = "AliExpress",
+                category = AppCategory.ECOMMERCE,
+                zhPrompt = "速卖通(AliExpress)是阿里巴巴国际零售平台",
+                enPrompt = "AliExpress is Alibaba's international retail platform",
+                aliases = listOf("速卖通", "aliexpress", "AliExpress")
+            )
+        )
 
         // ============================================
         // TRAVEL & TRANSPORTATION APPS
