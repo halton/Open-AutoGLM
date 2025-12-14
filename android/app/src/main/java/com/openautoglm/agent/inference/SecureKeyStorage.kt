@@ -50,7 +50,7 @@ class SecureKeyStorage(context: Context) {
         private const val KEY_DASHSCOPE_MODEL_ID = "dashscope_model_id"
 
         // Default model IDs
-        const val DEFAULT_BIGMODEL_MODEL = "AutoGLM-Phone-9B"
+        const val DEFAULT_BIGMODEL_MODEL = "AutoGLM-Phone"
         const val DEFAULT_DASHSCOPE_MODEL = "qwen2.5-vl-72b-instruct"
     }
 
@@ -280,7 +280,7 @@ class SecureKeyStorage(context: Context) {
  * Enum representing supported cloud inference providers.
  */
 enum class InferenceProvider {
-    /** BigModel/ZhipuAI provider (AutoGLM-Phone-9B) */
+    /** BigModel/ZhipuAI provider (AutoGLM-Phone) */
     BIGMODEL,
 
     /** DashScope/Alibaba Cloud provider (Qwen2.5-VL-72B) */

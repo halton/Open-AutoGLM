@@ -42,7 +42,7 @@ class TapActionHandler : BaseActionHandler() {
 
     override suspend fun executeInternal(action: Action): ExecutionResult {
         // Get AccessibilityService instance
-        val service = AutoGLMAccessibilityService.getInstance()
+        val service = AutoGLMAccessibilityService.instance
             ?: return ExecutionResult.Failure(
                 error = "AccessibilityService not available",
                 errorCode = "SERVICE_UNAVAILABLE",

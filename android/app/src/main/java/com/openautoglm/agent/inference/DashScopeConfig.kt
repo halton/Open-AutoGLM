@@ -66,7 +66,7 @@ object DashScopeConfig {
         const val ENABLE_SEARCH = false
 
         /** Seed for reproducible results */
-        const val SEED: Int? = null
+        val SEED: Int? = null
     }
 
     /**

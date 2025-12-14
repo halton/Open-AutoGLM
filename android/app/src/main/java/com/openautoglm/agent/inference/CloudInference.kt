@@ -8,6 +8,7 @@ import com.openautoglm.agent.model.ModelClient
 import com.openautoglm.agent.model.ModelResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -21,7 +22,7 @@ import java.util.concurrent.TimeUnit
  * Cloud inference client for making API calls to remote VLM providers.
  *
  * Supports multiple cloud providers:
- * - BigModel (AutoGLM-Phone-9B)
+ * - BigModel (AutoGLM-Phone)
  * - DashScope (Qwen2.5-VL-72B)
  * - OpenAI-compatible endpoints
  * - Custom self-hosted models
@@ -37,10 +38,13 @@ class CloudInference(
 
     private val secureStorage = SecureKeyStorage(context)
 
+    @OptIn(ExperimentalSerializationApi::class)
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
         encodeDefaults = true
+        explicitNulls = false  // Don't encode null values in JSON
+        classDiscriminator = "__type"
     }
 
     private val httpClient = OkHttpClient.Builder()
@@ -55,6 +59,19 @@ class CloudInference(
     }
 
     /**
+     * Sends a list of chat messages to the model and returns the response.
+     * Implements the ModelClient interface using default parameters.
+     */
+    override suspend fun request(messages: List<ChatMessage>): ModelResponse {
+        return generateChatCompletion(
+            messages = messages,
+            temperature = 0.7f,
+            maxTokens = 2048,
+            modelOverride = null
+        )
+    }
+
+    /**
      * Generates a chat completion using the configured cloud provider.
      *
      * @param messages List of chat messages (system, user, assistant)
@@ -63,7 +80,7 @@ class CloudInference(
      * @param modelOverride Optional model ID to override default
      * @return ModelResponse with thinking and action
      */
-    override suspend fun generateChatCompletion(
+    suspend fun generateChatCompletion(
         messages: List<ChatMessage>,
         temperature: Float,
         maxTokens: Int,
@@ -93,12 +110,20 @@ class CloudInference(
             }
         }
 
+        // Only send frequency_penalty to providers that support it (OpenAI)
+        // BigModel and DashScope don't support this parameter
+        val frequencyPenalty = when (provider) {
+            InferenceProvider.OPENAI -> 0.2f
+            else -> null
+        }
+
         val request = ChatCompletionRequest(
             model = model,
             messages = messages,
             temperature = temperature,
             maxTokens = maxTokens,
             topP = 0.9f,
+            frequencyPenalty = frequencyPenalty,
             stream = false
         )
 
@@ -116,11 +141,17 @@ class CloudInference(
         provider: InferenceProvider
     ): ChatCompletionResponse = withContext(Dispatchers.IO) {
         val requestBody = json.encodeToString(request)
-            .toRequestBody(MEDIA_TYPE_JSON.toMediaType())
+
+        // Log the request for debugging
+        android.util.Log.d("CloudInference", "=== API Request to $provider ===")
+        android.util.Log.d("CloudInference", "URL: $url")
+        android.util.Log.d("CloudInference", "Request Body: $requestBody")
+
+        val requestBodyData = requestBody.toRequestBody(MEDIA_TYPE_JSON.toMediaType())
 
         val httpRequest = Request.Builder()
             .url(url)
-            .post(requestBody)
+            .post(requestBodyData)
             .addHeader("Authorization", "Bearer $apiKey")
             .addHeader("Content-Type", "application/json")
             .apply {
@@ -155,33 +186,72 @@ class CloudInference(
 
     /**
      * Parses the ChatCompletionResponse into a ModelResponse.
+     *
+     * Parsing rules (matching Python implementation):
+     * 1. If content contains 'finish(message=', everything before is thinking,
+     *    everything from 'finish(message=' onwards is action.
+     * 2. If rule 1 doesn't apply but content contains 'do(action=',
+     *    everything before is thinking, everything from 'do(action=' onwards is action.
+     * 3. Fallback: If content contains '<answer>', use legacy parsing with XML tags.
+     * 4. Otherwise, return empty thinking and full content as action.
      */
     private fun parseModelResponse(response: ChatCompletionResponse): ModelResponse {
-        val content = response.choices.firstOrNull()?.message?.content
+        val messageContent = response.choices.firstOrNull()?.message?.content
             ?: throw IllegalStateException("No content in response")
 
-        // Parse <think>...</think> and <answer>...</answer> tags
-        val thinkRegex = Regex("<think>(.*?)</think>", RegexOption.DOT_MATCHES_ALL)
-        val answerRegex = Regex("<answer>(.*?)</answer>", RegexOption.DOT_MATCHES_ALL)
+        val content = messageContent.asText()
 
-        val thinkMatch = thinkRegex.find(content)
-        val answerMatch = answerRegex.find(content)
+        // Log response for debugging
+        android.util.Log.d("CloudInference", "=== Model Response ===")
+        android.util.Log.d("CloudInference", "Raw content: $content")
 
-        val thinking = thinkMatch?.groupValues?.get(1)?.trim() ?: ""
-        val action = answerMatch?.groupValues?.get(1)?.trim()
-            ?: throw IllegalStateException("No <answer> tag found in response")
+        val (thinking, action) = parseThinkingAndAction(content)
 
         return ModelResponse(
             thinking = thinking,
             action = action,
-            rawResponse = content,
-            modelId = response.model,
-            usage = mapOf(
-                "prompt_tokens" to response.usage.promptTokens.toString(),
-                "completion_tokens" to response.usage.completionTokens.toString(),
-                "total_tokens" to response.usage.totalTokens.toString()
-            )
+            rawContent = content,
+            inferenceTimeMs = 0L,
+            modelUsed = response.model,
+            tokenCount = response.usage?.totalTokens
         )
+    }
+
+    /**
+     * Parses thinking and action from model response content.
+     */
+    private fun parseThinkingAndAction(content: String): Pair<String, String> {
+        // Rule 1: Check for finish(message=
+        if (content.contains("finish(message=")) {
+            val parts = content.split("finish(message=", limit = 2)
+            val thinking = parts[0].trim()
+            val action = "finish(message=" + parts[1]
+            return Pair(thinking, action)
+        }
+
+        // Rule 2: Check for do(action=
+        if (content.contains("do(action=")) {
+            val parts = content.split("do(action=", limit = 2)
+            val thinking = parts[0].trim()
+            val action = "do(action=" + parts[1]
+            return Pair(thinking, action)
+        }
+
+        // Rule 3: Fallback to legacy XML tag parsing
+        if (content.contains("<answer>")) {
+            val thinkRegex = Regex("<think>(.*?)</think>", RegexOption.DOT_MATCHES_ALL)
+            val answerRegex = Regex("<answer>(.*?)</answer>", RegexOption.DOT_MATCHES_ALL)
+
+            val thinkMatch = thinkRegex.find(content)
+            val answerMatch = answerRegex.find(content)
+
+            val thinking = thinkMatch?.groupValues?.get(1)?.trim() ?: ""
+            val action = answerMatch?.groupValues?.get(1)?.trim() ?: content
+            return Pair(thinking, action)
+        }
+
+        // Rule 4: No markers found, return content as action
+        return Pair("", content)
     }
 
     /**
@@ -239,7 +309,7 @@ class CloudInference(
                 ChatMessage.system("Test configuration"),
                 ChatMessage.user("Hello")
             )
-            generateChatCompletion(testMessages, temperature = 0.1f, maxTokens = 10)
+            generateChatCompletion(testMessages, temperature = 0.1f, maxTokens = 10, modelOverride = null)
             true
         } catch (e: Exception) {
             false

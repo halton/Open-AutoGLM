@@ -1,13 +1,16 @@
 package com.openautoglm.agent.model
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Response from the chat completion API (OpenAI-compatible format).
  */
+@Serializable
 data class ChatCompletionResponse(
     val id: String,
-    val `object`: String = "chat.completion",
+    @SerialName("object")
+    val objectType: String = "chat.completion",
     val created: Long,
     val model: String,
     val choices: List<Choice>,
@@ -17,21 +20,23 @@ data class ChatCompletionResponse(
 /**
  * A single choice in the chat completion response.
  */
+@Serializable
 data class Choice(
     val index: Int,
     val message: ChatMessage,
-    @SerializedName("finish_reason")
+    @SerialName("finish_reason")
     val finishReason: String
 )
 
 /**
  * Token usage statistics for the completion request.
  */
+@Serializable
 data class Usage(
-    @SerializedName("prompt_tokens")
+    @SerialName("prompt_tokens")
     val promptTokens: Int,
-    @SerializedName("completion_tokens")
+    @SerialName("completion_tokens")
     val completionTokens: Int,
-    @SerializedName("total_tokens")
+    @SerialName("total_tokens")
     val totalTokens: Int
 )

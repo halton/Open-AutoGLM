@@ -3,15 +3,12 @@ package com.openautoglm.agent.data.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import androidx.room.TypeConverter
-import androidx.room.TypeConverters
 
 /**
  * Entity representing a model configuration for VLM inference.
  * Supports both local (on-device) and cloud-based inference configurations.
  */
 @Entity(tableName = "model_configs")
-@TypeConverters(ModelConfigConverters::class)
 data class ModelConfig(
     @PrimaryKey
     @ColumnInfo(name = "id")
@@ -71,10 +68,3 @@ data class ModelConfig(
 /**
  * Type converters for ModelConfig entity.
  */
-class ModelConfigConverters {
-    @TypeConverter
-    fun fromInferenceType(type: InferenceType): String = type.name
-
-    @TypeConverter
-    fun toInferenceType(typeString: String): InferenceType = InferenceType.valueOf(typeString)
-}
