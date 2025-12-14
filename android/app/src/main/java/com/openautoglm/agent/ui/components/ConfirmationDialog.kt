@@ -145,3 +145,243 @@ fun PaymentConfirmationDialog(
         onDismiss = onDismiss
     )
 }
+
+/**
+ * Data class representing an item in a food order.
+ */
+data class OrderItem(
+    val name: String,
+    val quantity: Int,
+    val price: String? = null,
+    val customizations: List<String> = emptyList()
+)
+
+/**
+ * Confirmation dialog for food orders.
+ *
+ * Displays order details including items, restaurant, delivery info,
+ * and total cost before submitting the order.
+ */
+@Composable
+fun OrderConfirmationDialog(
+    restaurantName: String,
+    items: List<OrderItem>,
+    subtotal: String? = null,
+    deliveryFee: String? = null,
+    discount: String? = null,
+    total: String,
+    deliveryAddress: String? = null,
+    estimatedDeliveryTime: String? = null,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Confirm Order",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Restaurant name
+                Text(
+                    text = restaurantName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Divider()
+
+                // Order items
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Order Items",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        items.forEach { item ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "${item.quantity}x ${item.name}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    if (item.customizations.isNotEmpty()) {
+                                        Text(
+                                            text = item.customizations.joinToString(", "),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                item.price?.let { price ->
+                                    Text(
+                                        text = price,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Price breakdown
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        subtotal?.let {
+                            PriceRow(label = "Subtotal", value = it)
+                        }
+                        deliveryFee?.let {
+                            PriceRow(label = "Delivery Fee", value = it)
+                        }
+                        discount?.let {
+                            PriceRow(
+                                label = "Discount",
+                                value = "-$it",
+                                valueColor = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Divider(modifier = Modifier.padding(vertical = 4.dp))
+                        PriceRow(
+                            label = "Total",
+                            value = total,
+                            isBold = true
+                        )
+                    }
+                }
+
+                // Delivery info
+                if (deliveryAddress != null || estimatedDeliveryTime != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Delivery Info",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            deliveryAddress?.let {
+                                Text(
+                                    text = it,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            estimatedDeliveryTime?.let {
+                                Text(
+                                    text = "Est. delivery: $it",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Warning
+                Text(
+                    text = "This will submit your order and may charge your payment method.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onConfirm()
+                    onDismiss()
+                }
+            ) {
+                Text("Place Order")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+/**
+ * Helper composable for price rows in order summary.
+ */
+@Composable
+private fun PriceRow(
+    label: String,
+    value: String,
+    isBold: Boolean = false,
+    valueColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = if (isBold) FontWeight.Bold else FontWeight.Medium,
+            color = valueColor
+        )
+    }
+}
+
+/**
+ * Simplified order confirmation dialog with minimal details.
+ */
+@Composable
+fun SimpleOrderConfirmationDialog(
+    restaurantName: String,
+    itemCount: Int,
+    total: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ConfirmationDialog(
+        title = "Confirm Order",
+        message = "Ready to place your order from $restaurantName?",
+        actionName = "Place Order",
+        details = listOf(
+            "Restaurant" to restaurantName,
+            "Items" to "$itemCount item(s)",
+            "Total" to total
+        ),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss
+    )
+}
