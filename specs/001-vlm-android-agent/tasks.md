@@ -156,24 +156,24 @@
 
 ### Food Delivery App Mappings
 
-- [ ] T065 [P] [US2] Add Meituan app mapping with UI patterns in android/app/src/main/assets/app_mappings.json
-- [ ] T066 [P] [US2] Add Eleme app mapping with UI patterns in android/app/src/main/assets/app_mappings.json
-- [ ] T067 [P] [US2] Add Uber Eats app mapping with UI patterns in android/app/src/main/assets/app_mappings.json
+- [x] T065 [P] [US2] Add Meituan app mapping with UI patterns in android/app/src/main/java/com/openautoglm/agent/knowledge/DefaultAppMappings.kt
+- [x] T066 [P] [US2] Add Eleme app mapping with UI patterns in android/app/src/main/java/com/openautoglm/agent/knowledge/DefaultAppMappings.kt
+- [x] T067 [P] [US2] Add Uber Eats/DoorDash/Grubhub app mappings in android/app/src/main/java/com/openautoglm/agent/knowledge/DefaultAppMappings.kt
 
 ### Restaurant Detection and Menu Navigation
 
-- [ ] T068 [US2] Implement restaurant search and selection logic in android/app/src/main/java/com/openautoglm/agent/agent/RestaurantFinder.kt
-- [ ] T069 [US2] Implement menu item matching from natural language description in android/app/src/main/java/com/openautoglm/agent/agent/MenuMatcher.kt
-- [ ] T070 [US2] Implement cart management actions (add to cart, view cart) in android/app/src/main/java/com/openautoglm/agent/actions/handlers/CartAction.kt
+- [x] T068 [US2] Implement restaurant search and selection logic in android/app/src/main/java/com/openautoglm/agent/agent/RestaurantFinder.kt
+- [x] T069 [US2] Implement menu item matching from natural language description in android/app/src/main/java/com/openautoglm/agent/agent/MenuMatcher.kt
+- [x] T070 [US2] Implement cart management actions (add to cart, view cart) in android/app/src/main/java/com/openautoglm/agent/agent/CartManager.kt
 
 ### Alternative Suggestions
 
-- [ ] T071 [US2] Implement restaurant availability detection (closed/unavailable) in android/app/src/main/java/com/openautoglm/agent/agent/AvailabilityChecker.kt
-- [ ] T072 [US2] Implement alternative restaurant suggestion logic in android/app/src/main/java/com/openautoglm/agent/agent/AlternativeSuggester.kt
+- [x] T071 [US2] Implement restaurant availability detection (closed/unavailable) in android/app/src/main/java/com/openautoglm/agent/agent/AvailabilityChecker.kt
+- [x] T072 [US2] Implement alternative restaurant suggestion logic in android/app/src/main/java/com/openautoglm/agent/agent/AlternativeSuggester.kt
 
 ### Order Confirmation UI
 
-- [ ] T073 [US2] Create OrderConfirmationDialog with cart summary in android/app/src/main/java/com/openautoglm/agent/ui/components/OrderConfirmationDialog.kt
+- [x] T073 [US2] Create OrderConfirmationDialog with cart summary in android/app/src/main/java/com/openautoglm/agent/ui/components/ConfirmationDialog.kt
 
 **Checkpoint**: User Story 2 complete - food ordering functional
 

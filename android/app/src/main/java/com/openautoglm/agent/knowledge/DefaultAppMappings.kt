@@ -352,6 +352,36 @@ object DefaultAppMappings {
                 aliases = listOf("McDonald", "mcdonald", "麦当劳")
             )
         )
+        add(
+            AppMapping.create(
+                packageName = "com.ubercab.eats",
+                appName = "Uber Eats",
+                category = AppCategory.FOOD,
+                zhPrompt = "Uber Eats是国际外卖配送平台，提供餐厅外卖服务",
+                enPrompt = "Uber Eats is an international food delivery platform for restaurant orders",
+                aliases = listOf("UberEats", "ubereats", "Uber eats")
+            )
+        )
+        add(
+            AppMapping.create(
+                packageName = "com.dd.doordash",
+                appName = "DoorDash",
+                category = AppCategory.FOOD,
+                zhPrompt = "DoorDash是美国领先的外卖配送平台",
+                enPrompt = "DoorDash is a leading food delivery platform in the US",
+                aliases = listOf("Doordash", "doordash")
+            )
+        )
+        add(
+            AppMapping.create(
+                packageName = "com.grubhub.android",
+                appName = "Grubhub",
+                category = AppCategory.FOOD,
+                zhPrompt = "Grubhub是美国外卖配送平台",
+                enPrompt = "Grubhub is a food delivery platform in the US",
+                aliases = listOf("grubhub", "GrubHub")
+            )
+        )
 
         // ============================================
         // ENTERTAINMENT APPS
