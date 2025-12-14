@@ -119,11 +119,11 @@
 
 ### Action Handlers
 
-- [ ] T050 [P] [US1] Implement TapAction handler in android/app/src/main/java/com/openautoglm/agent/actions/handlers/TapAction.kt
-- [ ] T051 [P] [US1] Implement SwipeAction handler in android/app/src/main/java/com/openautoglm/agent/actions/handlers/SwipeAction.kt
-- [ ] T052 [P] [US1] Implement TypeAction handler in android/app/src/main/java/com/openautoglm/agent/actions/handlers/TypeAction.kt
-- [ ] T053 [P] [US1] Implement LaunchAction handler in android/app/src/main/java/com/openautoglm/agent/actions/handlers/LaunchAction.kt
-- [ ] T054 [P] [US1] Implement NavigationAction handler (BACK, HOME) in android/app/src/main/java/com/openautoglm/agent/actions/handlers/NavigationAction.kt
+- [X] T050 [P] [US1] Implement TapAction handler in android/app/src/main/java/com/openautoglm/agent/actions/handlers/TapAction.kt
+- [X] T051 [P] [US1] Implement SwipeAction handler in android/app/src/main/java/com/openautoglm/agent/actions/handlers/SwipeAction.kt
+- [X] T052 [P] [US1] Implement TypeAction handler in android/app/src/main/java/com/openautoglm/agent/actions/handlers/TypeAction.kt
+- [X] T053 [P] [US1] Implement LaunchAction handler in android/app/src/main/java/com/openautoglm/agent/actions/handlers/LaunchAction.kt
+- [X] T054 [P] [US1] Implement NavigationAction handler (BACK, HOME) in android/app/src/main/java/com/openautoglm/agent/actions/handlers/NavigationAction.kt
 
 ### E-commerce App Mappings
 
