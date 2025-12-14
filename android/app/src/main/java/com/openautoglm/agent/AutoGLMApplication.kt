@@ -5,9 +5,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import com.openautoglm.agent.data.AgentRepository
 import com.openautoglm.agent.data.AppDatabase
-import com.openautoglm.agent.data.TaskRepository
-import com.openautoglm.agent.knowledge.AppRegistry
+import com.openautoglm.agent.knowledge.AppKnowledgeBase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,13 +32,19 @@ class AutoGLMApplication : Application() {
     }
 
     // Lazy-initialized repository
-    val taskRepository: TaskRepository by lazy {
-        TaskRepository(database.taskDao(), database.actionDao())
+    val agentRepository: AgentRepository by lazy {
+        AgentRepository(
+            taskDao = database.taskDao(),
+            actionDao = database.actionDao(),
+            appMappingDao = database.appMappingDao(),
+            userPreferencesDao = database.userPreferencesDao(),
+            modelConfigDao = database.modelConfigDao()
+        )
     }
 
-    // Lazy-initialized app registry
-    val appRegistry: AppRegistry by lazy {
-        AppRegistry(this)
+    // Lazy-initialized app knowledge base
+    val appKnowledgeBase: AppKnowledgeBase by lazy {
+        AppKnowledgeBase(agentRepository)
     }
 
     override fun onCreate() {
@@ -48,9 +54,9 @@ class AutoGLMApplication : Application() {
         // Create notification channels
         createNotificationChannels()
 
-        // Initialize app registry in background
+        // Initialize app knowledge base in background
         applicationScope.launch {
-            appRegistry.loadMappings()
+            appKnowledgeBase.initialize()
         }
     }
 

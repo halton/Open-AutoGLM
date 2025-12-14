@@ -1,11 +1,18 @@
 package com.openautoglm.agent.model
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonContentPolymorphicSerializer
-import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Represents a chat message compatible with OpenAI Chat Completions API format.
@@ -125,24 +132,26 @@ sealed class ContentPart {
         /**
          * Creates an image URL content part.
          */
-        fun imageUrl(url: String, detail: ImageDetail = ImageDetail.AUTO): ContentPart =
+        fun imageUrl(url: String, detail: ImageDetail? = null): ContentPart =
             ImageUrlPart(imageUrl = ImageUrl(url = url, detail = detail))
 
         /**
          * Creates an image content part from base64-encoded data.
+         * Note: detail is null by default for compatibility with providers that don't support it.
          */
-        fun imageBase64(base64Data: String, mediaType: String = "image/png", detail: ImageDetail = ImageDetail.AUTO): ContentPart =
+        fun imageBase64(base64Data: String, mediaType: String = "image/png", detail: ImageDetail? = null): ContentPart =
             ImageUrlPart(imageUrl = ImageUrl(url = "data:$mediaType;base64,$base64Data", detail = detail))
     }
 }
 
 /**
  * Represents an image URL with optional detail level for vision models.
+ * Note: detail is nullable because some providers (e.g., BigModel) don't support it.
  */
 @Serializable
 data class ImageUrl(
     val url: String,
-    val detail: ImageDetail = ImageDetail.AUTO
+    val detail: ImageDetail? = null
 )
 
 /**
@@ -171,10 +180,36 @@ enum class ImageDetail {
  * - A JSON string becomes Text content
  * - A JSON array becomes Parts content
  */
-object MessageContentSerializer : JsonContentPolymorphicSerializer<MessageContent>(MessageContent::class) {
-    override fun selectDeserializer(element: JsonElement) = when {
-        element is JsonPrimitive && element.isString -> MessageContent.Text.serializer()
-        element.jsonArray != null -> MessageContent.Parts.serializer()
-        else -> throw IllegalArgumentException("Unknown MessageContent format: $element")
+object MessageContentSerializer : KSerializer<MessageContent> {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("MessageContent")
+
+    override fun serialize(encoder: Encoder, value: MessageContent) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw IllegalArgumentException("MessageContent can only be serialized to JSON")
+
+        val element = when (value) {
+            is MessageContent.Text -> JsonPrimitive(value.text)
+            is MessageContent.Parts -> jsonEncoder.json.encodeToJsonElement(
+                ListSerializer(ContentPart.serializer()),
+                value.parts
+            )
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: Decoder): MessageContent {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw IllegalArgumentException("MessageContent can only be deserialized from JSON")
+
+        return when (val element = jsonDecoder.decodeJsonElement()) {
+            is JsonPrimitive -> MessageContent.Text(element.jsonPrimitive.content)
+            is JsonArray -> MessageContent.Parts(
+                jsonDecoder.json.decodeFromJsonElement(
+                    ListSerializer(ContentPart.serializer()),
+                    element
+                )
+            )
+            else -> throw IllegalArgumentException("Unknown MessageContent format: $element")
+        }
     }
 }

@@ -1,8 +1,15 @@
 package com.openautoglm.agent.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.media.projection.MediaProjectionManager
 import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,6 +36,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.openautoglm.agent.R
+import com.openautoglm.agent.accessibility.ScreenCaptureManager
 import com.openautoglm.agent.ui.screens.HistoryScreen
 import com.openautoglm.agent.ui.screens.SettingsScreen
 import com.openautoglm.agent.ui.screens.TaskScreen
@@ -43,8 +51,47 @@ import com.openautoglm.agent.ui.theme.AutoGLMTheme
  * - Settings: Configure API keys, models, and preferences
  */
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        private const val TAG = "MainActivity"
+
+        @Volatile
+        private var screenCapturePermissionGranted = false
+
+        fun isScreenCapturePermissionGranted() = screenCapturePermissionGranted
+    }
+
+    private val screenCaptureManager by lazy {
+        ScreenCaptureManager.getInstance(this)
+    }
+
+    private val screenCaptureLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            val success = screenCaptureManager.startCapture(result.resultCode, result.data!!)
+            if (success) {
+                screenCapturePermissionGranted = true
+                Toast.makeText(this, "Screen capture permission granted", Toast.LENGTH_SHORT).show()
+                Log.i(TAG, "Screen capture started successfully")
+            } else {
+                screenCapturePermissionGranted = false
+                Toast.makeText(this, "Failed to start screen capture", Toast.LENGTH_LONG).show()
+                Log.e(TAG, "Failed to start screen capture")
+            }
+        } else {
+            screenCapturePermissionGranted = false
+            Toast.makeText(this, "Screen capture permission denied", Toast.LENGTH_LONG).show()
+            Log.w(TAG, "Screen capture permission denied")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Request screen capture permission on startup
+        requestScreenCapturePermission()
+
         setContent {
             AutoGLMTheme {
                 Surface(
@@ -54,6 +101,30 @@ class MainActivity : ComponentActivity() {
                     MainScreen()
                 }
             }
+        }
+    }
+
+    private fun requestScreenCapturePermission() {
+        // Start foreground service required for MediaProjection on Android 14+
+        val serviceIntent = Intent(this, com.openautoglm.agent.service.ScreenCaptureService::class.java)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+
+        val mediaProjectionManager =
+            getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        val captureIntent = mediaProjectionManager.createScreenCaptureIntent()
+        screenCaptureLauncher.launch(captureIntent)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (screenCapturePermissionGranted) {
+            screenCaptureManager.stopCapture()
+            // Stop the foreground service
+            stopService(Intent(this, com.openautoglm.agent.service.ScreenCaptureService::class.java))
         }
     }
 }

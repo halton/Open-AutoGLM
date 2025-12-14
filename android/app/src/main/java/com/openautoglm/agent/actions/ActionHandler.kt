@@ -123,27 +123,16 @@ fun ExecutionResult.toActionResult(actionId: String): ActionResult {
     return when (this) {
         is ExecutionResult.Success -> ActionResult(
             success = true,
-            message = message,
-            errorMessage = null,
-            data = data ?: emptyMap()
+            message = message
         )
         is ExecutionResult.Failure -> ActionResult(
             success = false,
-            message = null,
-            errorMessage = error,
-            data = mapOf(
-                "error_code" to (errorCode ?: "UNKNOWN"),
-                "is_retryable" to isRetryable.toString()
-            )
+            message = error
         )
         is ExecutionResult.RequiresIntervention -> ActionResult(
             success = false,
-            message = message,
-            errorMessage = "User intervention required: ${reason.name}",
-            data = mapOf(
-                "intervention_reason" to reason.name,
-                "requires_user" to "true"
-            )
+            message = "User intervention required: ${reason.name} - $message",
+            requiresConfirmation = true
         )
     }
 }

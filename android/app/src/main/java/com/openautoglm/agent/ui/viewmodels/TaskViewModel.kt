@@ -23,9 +23,15 @@ import kotlinx.coroutines.launch
 class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = AppDatabase.getInstance(application)
-    private val repository = AgentRepository.getInstance(database)
+    private val repository = AgentRepository(
+        taskDao = database.taskDao(),
+        actionDao = database.actionDao(),
+        appMappingDao = database.appMappingDao(),
+        userPreferencesDao = database.userPreferencesDao(),
+        modelConfigDao = database.modelConfigDao()
+    )
     private val modelClient = CloudInference(application)
-    private val screenCapture = ScreenCaptureManager(application)
+    private val screenCapture = ScreenCaptureManager.getInstance(application)
     private val config = AgentConfig.DEFAULT
 
     private val agent = PhoneAgent(
@@ -42,13 +48,30 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
      * Starts a new task.
      */
     fun startTask(taskDescription: String) {
+        android.util.Log.i("TaskViewModel", "========== START TASK CALLED ==========")
+        android.util.Log.i("TaskViewModel", "Task description: $taskDescription")
+
+        // Check if screen capture permission is granted
+        if (!com.openautoglm.agent.ui.MainActivity.isScreenCapturePermissionGranted()) {
+            android.util.Log.e("TaskViewModel", "ERROR: Screen capture permission not granted")
+            return
+        }
+
+        android.util.Log.i("TaskViewModel", "Screen capture permission OK, starting agent...")
+
         viewModelScope.launch {
             try {
+                android.util.Log.i("TaskViewModel", "Calling agent.run()...")
                 agent.run(taskDescription)
+                android.util.Log.i("TaskViewModel", "agent.run() completed")
             } catch (e: Exception) {
                 // Error handling - state will be updated by agent
+                android.util.Log.e("TaskViewModel", "ERROR in agent.run()", e)
+                e.printStackTrace()
             }
         }
+
+        android.util.Log.i("TaskViewModel", "startTask() method completed")
     }
 
     /**

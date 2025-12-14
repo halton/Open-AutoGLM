@@ -34,7 +34,7 @@ class SwipeActionHandler : BaseActionHandler() {
 
     override suspend fun executeInternal(action: Action): ExecutionResult {
         // Get AccessibilityService instance
-        val service = AutoGLMAccessibilityService.getInstance()
+        val service = AutoGLMAccessibilityService.instance
             ?: return ExecutionResult.Failure(
                 error = "AccessibilityService not available",
                 errorCode = "SERVICE_UNAVAILABLE",
@@ -71,7 +71,7 @@ class SwipeActionHandler : BaseActionHandler() {
             startY = startY,
             endX = endX,
             endY = endY,
-            durationMs = duration
+            duration = duration
         )
 
         if (!success) {

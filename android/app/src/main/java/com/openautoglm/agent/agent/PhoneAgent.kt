@@ -1,8 +1,11 @@
 package com.openautoglm.agent.agent
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.util.Base64
 import android.util.Log
 import com.openautoglm.agent.accessibility.ScreenCaptureManager
+import com.openautoglm.agent.core.ActionExecutor
 import com.openautoglm.agent.core.ResponseParser
 import com.openautoglm.agent.data.AgentRepository
 import com.openautoglm.agent.data.entities.Action
@@ -16,6 +19,7 @@ import com.openautoglm.agent.model.ModelClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 
 /**
@@ -45,9 +49,21 @@ class PhoneAgent(
     private val config: AgentConfig = AgentConfig.DEFAULT,
     private val context: Context
 ) {
+    // ActionExecutor for actually performing UI actions
+    private val actionExecutor = ActionExecutor(context)
 
     companion object {
         private const val TAG = "PhoneAgent"
+
+        /**
+         * Converts a Bitmap to base64-encoded string.
+         */
+        private fun Bitmap.toBase64(quality: Int = 80): String {
+            val outputStream = ByteArrayOutputStream()
+            compress(Bitmap.CompressFormat.PNG, quality, outputStream)
+            val byteArray = outputStream.toByteArray()
+            return Base64.encodeToString(byteArray, Base64.NO_WRAP)
+        }
     }
 
     // Internal state
@@ -75,7 +91,6 @@ class PhoneAgent(
         val task = Task(
             description = taskDescription,
             status = TaskStatus.RUNNING,
-            language = config.language,
             maxSteps = config.maxStepsPerTask
         )
         repository.insertTask(task)
@@ -132,7 +147,6 @@ class PhoneAgent(
                 val task = Task(
                     description = taskDescription,
                     status = TaskStatus.RUNNING,
-                    language = config.language,
                     maxSteps = config.maxStepsPerTask
                 )
                 repository.insertTask(task)
@@ -205,7 +219,7 @@ class PhoneAgent(
             )
 
             // Capture current screen state
-            val screenshot = screenCapture.captureScreen(config.screenshotQuality)
+            val screenshot = screenCapture.captureScreen()
                 ?: return StepResult(
                     success = false,
                     finished = true,
@@ -213,6 +227,9 @@ class PhoneAgent(
                     thinking = "",
                     message = "Failed to capture screenshot"
                 )
+
+            // Convert screenshot to base64
+            val screenshotBase64 = screenshot.toBase64()
 
             // Build conversation messages
             if (isFirst) {
@@ -224,19 +241,21 @@ class PhoneAgent(
                 conversationContext.add(ChatMessage.system(systemPrompt))
 
                 // Add user message with task and screenshot
+                // Note: Image comes BEFORE text for BigModel API compatibility
                 val userMessage = ChatMessage.user(
                     listOf(
-                        ContentPart.text("Task: $userPrompt\n\nCurrent screen:"),
-                        ContentPart.imageBase64(screenshot.base64Data, "image/png")
+                        ContentPart.imageBase64(screenshotBase64, "image/png"),
+                        ContentPart.text("Task: $userPrompt")
                     )
                 )
                 conversationContext.add(userMessage)
             } else {
                 // Add screenshot with screen info
+                // Note: Image comes BEFORE text for BigModel API compatibility
                 val userMessage = ChatMessage.user(
                     listOf(
-                        ContentPart.text("** Screen Info **\n\nCurrent screen:"),
-                        ContentPart.imageBase64(screenshot.base64Data, "image/png")
+                        ContentPart.imageBase64(screenshotBase64, "image/png"),
+                        ContentPart.text("** Screen Info **")
                     )
                 )
                 conversationContext.add(userMessage)
@@ -244,11 +263,7 @@ class PhoneAgent(
 
             // Get model response
             val modelResponse = try {
-                modelClient.generateChatCompletion(
-                    messages = conversationContext,
-                    temperature = 0.3f,
-                    maxTokens = config.actionTimeout.toInt()
-                )
+                modelClient.request(conversationContext)
             } catch (e: Exception) {
                 Log.e(TAG, "Model inference error", e)
                 return StepResult(
@@ -326,15 +341,15 @@ class PhoneAgent(
     }
 
     /**
-     * Executes an action (placeholder - will be implemented by ActionExecutor).
+     * Executes an action using the ActionExecutor.
      */
     private suspend fun executeAction(action: Action): ActionExecutionResult {
-        // TODO: Implement via ActionExecutor in T049
-        // For now, return a simple success result
+        val result = actionExecutor.execute(action)
+
         return ActionExecutionResult(
-            success = true,
-            shouldFinish = action.type == ActionType.FINISH,
-            message = action.parameters["message"] as? String
+            success = result.success,
+            shouldFinish = action.type == ActionType.FINISH || result.shouldFinish,
+            message = result.message
         )
     }
 

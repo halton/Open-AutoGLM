@@ -276,7 +276,7 @@ class AgentLoop(
             progressCallback?.onActionCompleted(stepNumber, updatedAction, actionResult.success)
 
             if (!actionResult.success) {
-                Log.w(TAG, "Action failed at step $stepNumber: ${actionResult.errorMessage}")
+                Log.w(TAG, "Action failed at step $stepNumber: ${actionResult.message}")
                 // Continue the loop - VLM will see the current state and decide next action
             }
 
@@ -329,11 +329,7 @@ class AgentLoop(
         messages.add(ChatMessage.system(systemPrompt))
 
         // User message with task description and screenshot
-        val userPromptText = PromptTemplates.getUserPrompt(
-            taskDescription = task.description,
-            currentStep = task.stepCount + 1,
-            maxSteps = task.maxSteps
-        )
+        val userPromptText = "Task: ${task.description}\nStep ${task.stepCount + 1}/${task.maxSteps}\n\nCurrent screen:"
 
         // Build multimodal content with text and image
         val contentParts = mutableListOf<ContentPart>()
