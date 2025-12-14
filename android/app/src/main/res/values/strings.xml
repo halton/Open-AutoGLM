@@ -11,6 +11,11 @@
     <string name="history">History</string>
     <string name="loading">Loading…</string>
 
+    <!-- Navigation tabs -->
+    <string name="tab_tasks">Tasks</string>
+    <string name="tab_history">History</string>
+    <string name="tab_settings">Settings</string>
+
     <!-- Task status -->
     <string name="status_pending">Pending</string>
     <string name="status_running">Running</string>

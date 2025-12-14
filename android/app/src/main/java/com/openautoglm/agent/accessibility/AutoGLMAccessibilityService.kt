@@ -155,7 +155,10 @@ class AutoGLMAccessibilityService : AccessibilityService() {
      * @return true if the gesture was dispatched successfully, false otherwise.
      */
     fun performTap(x: Int, y: Int): Boolean {
+        android.util.Log.i("AutoGLMAccessibility", "performTap called: ($x, $y)")
+
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            android.util.Log.e("AutoGLMAccessibility", "API level too low for gestures: ${Build.VERSION.SDK_INT}")
             return false
         }
 
@@ -171,7 +174,9 @@ class AutoGLMAccessibilityService : AccessibilityService() {
         )
         gestureBuilder.addStroke(stroke)
 
-        return dispatchGestureAndWait(gestureBuilder.build())
+        val result = dispatchGestureAndWait(gestureBuilder.build())
+        android.util.Log.i("AutoGLMAccessibility", "performTap result: $result")
+        return result
     }
 
     /**
@@ -220,6 +225,7 @@ class AutoGLMAccessibilityService : AccessibilityService() {
      */
     private fun dispatchGestureAndWait(gesture: GestureDescription): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            android.util.Log.e("AutoGLMAccessibility", "dispatchGestureAndWait: API level too low")
             return false
         }
 
@@ -228,15 +234,18 @@ class AutoGLMAccessibilityService : AccessibilityService() {
 
             val callback = object : GestureResultCallback() {
                 override fun onCompleted(gestureDescription: GestureDescription?) {
+                    android.util.Log.i("AutoGLMAccessibility", "Gesture completed successfully")
                     deferred.complete(true)
                 }
 
                 override fun onCancelled(gestureDescription: GestureDescription?) {
+                    android.util.Log.w("AutoGLMAccessibility", "Gesture was cancelled")
                     deferred.complete(false)
                 }
             }
 
             val dispatched = dispatchGesture(gesture, callback, null)
+            android.util.Log.i("AutoGLMAccessibility", "dispatchGesture returned: $dispatched")
             if (!dispatched) {
                 return@runBlocking false
             }
@@ -281,6 +290,33 @@ class AutoGLMAccessibilityService : AccessibilityService() {
      */
     fun performNotifications(): Boolean {
         return performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+    }
+
+    /**
+     * Performs an Enter/IME action on the currently focused input field.
+     * This triggers the IME action (search, send, go, etc.) associated with the input field.
+     *
+     * On most keyboards, this taps the Enter/Search/Go button in the bottom-right area.
+     *
+     * @return true if the action was performed successfully.
+     */
+    fun performEnter(): Boolean {
+        android.util.Log.i("AutoGLMAccessibility", "performEnter called")
+
+        // Get screen dimensions to calculate keyboard enter button position
+        val displayMetrics = resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+
+        // The Enter/Search button is typically in the bottom-right corner of the keyboard
+        // Keyboard usually takes up about 40% of screen height
+        // Enter button is usually at around 90-95% of width and 85-90% of height
+        val enterX = (screenWidth * 0.92).toInt()
+        val enterY = (screenHeight * 0.87).toInt()
+
+        android.util.Log.i("AutoGLMAccessibility", "Tapping Enter key at ($enterX, $enterY)")
+
+        return performTap(enterX, enterY)
     }
 
     /**
