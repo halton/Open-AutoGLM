@@ -127,9 +127,9 @@
 
 ### E-commerce App Mappings
 
-- [ ] T055 [P] [US1] Add Taobao app mapping with UI patterns in android/app/src/main/assets/app_mappings.json
-- [ ] T056 [P] [US1] Add JD.com app mapping with UI patterns in android/app/src/main/assets/app_mappings.json
-- [ ] T057 [P] [US1] Add Amazon app mapping with UI patterns in android/app/src/main/assets/app_mappings.json
+- [X] T055 [P] [US1] Add Taobao app mapping with UI patterns in android/app/src/main/assets/app_mappings.json
+- [X] T056 [P] [US1] Add JD.com app mapping with UI patterns in android/app/src/main/assets/app_mappings.json
+- [X] T057 [P] [US1] Add Amazon app mapping with UI patterns in android/app/src/main/assets/app_mappings.json
 
 ### UI Implementation
 
@@ -141,8 +141,8 @@
 
 ### Error Handling for US1
 
-- [ ] T063 [US1] Implement bilingual error messages (zh/en) for cloud inference failures in android/app/src/main/java/com/openautoglm/agent/error/InferenceErrorHandler.kt
-- [ ] T064 [US1] Implement out-of-stock detection and handling in android/app/src/main/java/com/openautoglm/agent/agent/StockChecker.kt
+- [X] T063 [US1] Implement bilingual error messages (zh/en) for cloud inference failures in android/app/src/main/java/com/openautoglm/agent/error/InferenceErrorHandler.kt
+- [X] T064 [US1] Implement out-of-stock detection and handling in android/app/src/main/java/com/openautoglm/agent/agent/StockChecker.kt
 
 **Checkpoint**: User Story 1 complete - price comparison and purchase flow functional
 
