@@ -3,8 +3,6 @@ package com.openautoglm.agent.data.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import androidx.room.TypeConverter
-import androidx.room.TypeConverters
 import java.util.UUID
 
 /**
@@ -14,7 +12,6 @@ import java.util.UUID
  * through a series of steps until completion or failure.
  */
 @Entity(tableName = "tasks")
-@TypeConverters(TaskConverters::class)
 data class Task(
     @PrimaryKey
     @ColumnInfo(name = "id")
@@ -71,27 +68,4 @@ data class Task(
      * Check if the task has reached the maximum number of steps.
      */
     fun hasReachedMaxSteps(): Boolean = stepCount >= maxSteps
-}
-
-/**
- * Type converters for Room database to handle UUID and enum types.
- */
-class TaskConverters {
-    @TypeConverter
-    fun fromUUID(uuid: UUID?): String? = uuid?.toString()
-
-    @TypeConverter
-    fun toUUID(uuidString: String?): UUID? = uuidString?.let { UUID.fromString(it) }
-
-    @TypeConverter
-    fun fromTaskStatus(status: TaskStatus): String = status.name
-
-    @TypeConverter
-    fun toTaskStatus(statusString: String): TaskStatus = TaskStatus.valueOf(statusString)
-
-    @TypeConverter
-    fun fromInferenceMode(mode: InferenceMode): String = mode.name
-
-    @TypeConverter
-    fun toInferenceMode(modeString: String): InferenceMode = InferenceMode.valueOf(modeString)
 }

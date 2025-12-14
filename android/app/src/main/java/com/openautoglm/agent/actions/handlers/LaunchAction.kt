@@ -5,10 +5,12 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import com.openautoglm.agent.actions.BaseActionHandler
 import com.openautoglm.agent.actions.ExecutionResult
+import com.openautoglm.agent.data.AgentRepository
 import com.openautoglm.agent.data.entities.Action
 import com.openautoglm.agent.data.entities.ActionType
 import com.openautoglm.agent.knowledge.AppKnowledgeBase
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 /**
  * Handler for launching applications.
@@ -23,7 +25,8 @@ import kotlinx.coroutines.delay
  */
 class LaunchActionHandler(
     private val context: Context,
-    private val appKnowledgeBase: AppKnowledgeBase
+    private val appKnowledgeBase: AppKnowledgeBase,
+    private val repository: AgentRepository
 ) : BaseActionHandler() {
 
     companion object {
@@ -124,12 +127,12 @@ class LaunchActionHandler(
         // Try exact name match (case-insensitive)
         val normalizedId = identifier.lowercase()
         val allApps = try {
-            kotlinx.coroutines.flow.first(appKnowledgeBase.getAllAppMappings())
+            repository.getAllAppMappings().first()
         } catch (e: Exception) {
             emptyList()
         }
 
-        allApps.forEach { app ->
+        for (app in allApps) {
             if (app.appName.lowercase() == normalizedId ||
                 app.aliases.any { it.lowercase() == normalizedId }) {
                 return app.packageName

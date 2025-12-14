@@ -3,6 +3,8 @@ package com.openautoglm.agent.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -93,8 +95,13 @@ fun TaskScreen(
                 is AgentState.Idle -> {
                     Button(
                         onClick = {
+                            android.util.Log.i("TaskScreen", "===== START TASK BUTTON CLICKED =====")
+                            android.util.Log.i("TaskScreen", "Task input: '$taskInput'")
                             if (taskInput.isNotBlank()) {
+                                android.util.Log.i("TaskScreen", "Input valid, calling viewModel.startTask()")
                                 viewModel.startTask(taskInput)
+                            } else {
+                                android.util.Log.w("TaskScreen", "Task input is blank!")
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -205,11 +212,29 @@ fun TaskScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "✓ Task Completed",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "✓ Task Completed",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            IconButton(
+                                onClick = {
+                                    viewModel.reset()
+                                    taskInput = ""
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Dismiss",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
                         state.message?.let { message ->
                             Text(
                                 text = message,
@@ -231,11 +256,28 @@ fun TaskScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "Error",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Error",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            IconButton(
+                                onClick = {
+                                    viewModel.reset()
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Dismiss",
+                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
                         Text(
                             text = state.message,
                             style = MaterialTheme.typography.bodyMedium,

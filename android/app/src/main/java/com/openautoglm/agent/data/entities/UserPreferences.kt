@@ -3,14 +3,11 @@ package com.openautoglm.agent.data.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import androidx.room.TypeConverter
-import androidx.room.TypeConverters
 
 /**
  * User preferences entity for storing agent configuration and user settings.
  */
 @Entity(tableName = "user_preferences")
-@TypeConverters(UserPreferencesConverters::class)
 data class UserPreferences(
     @PrimaryKey
     @ColumnInfo(name = "id")
@@ -47,24 +44,3 @@ data class UserPreferences(
 /**
  * Type converters for UserPreferences entity.
  */
-class UserPreferencesConverters {
-    @TypeConverter
-    fun fromInferenceMode(mode: InferenceMode): String {
-        return mode.name
-    }
-
-    @TypeConverter
-    fun toInferenceMode(value: String): InferenceMode {
-        return InferenceMode.valueOf(value)
-    }
-
-    @TypeConverter
-    fun fromStringSet(set: Set<String>?): String? {
-        return set?.joinToString(separator = ",")
-    }
-
-    @TypeConverter
-    fun toStringSet(value: String?): Set<String>? {
-        return value?.split(",")?.toSet()?.takeIf { it.isNotEmpty() && it.first().isNotEmpty() }
-    }
-}

@@ -3,8 +3,6 @@ package com.openautoglm.agent.data.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import androidx.room.TypeConverter
-import androidx.room.TypeConverters
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
@@ -15,7 +13,6 @@ import com.google.gson.reflect.TypeToken
  * for the VLM agent to understand and interact with installed applications.
  */
 @Entity(tableName = "app_mappings")
-@TypeConverters(AppMappingConverters::class)
 data class AppMapping(
     /**
      * Android package name (e.g., "com.android.settings")
@@ -111,48 +108,3 @@ data class AppMapping(
 /**
  * Type converters for AppMapping entity.
  */
-class AppMappingConverters {
-    private val gson = Gson()
-
-    @TypeConverter
-    fun fromAppCategory(category: AppCategory): String = category.name
-
-    @TypeConverter
-    fun toAppCategory(categoryString: String): AppCategory = AppCategory.valueOf(categoryString)
-
-    @TypeConverter
-    fun fromStringList(list: List<String>?): String? {
-        return list?.let { gson.toJson(it) }
-    }
-
-    @TypeConverter
-    fun toStringList(json: String?): List<String>? {
-        if (json == null) return null
-        val type = object : TypeToken<List<String>>() {}.type
-        return gson.fromJson(json, type)
-    }
-
-    @TypeConverter
-    fun fromStringMap(map: Map<String, String>?): String? {
-        return map?.let { gson.toJson(it) }
-    }
-
-    @TypeConverter
-    fun toStringMap(json: String?): Map<String, String>? {
-        if (json == null) return null
-        val type = object : TypeToken<Map<String, String>>() {}.type
-        return gson.fromJson(json, type)
-    }
-
-    @TypeConverter
-    fun fromStringListMap(map: Map<String, List<String>>?): String? {
-        return map?.let { gson.toJson(it) }
-    }
-
-    @TypeConverter
-    fun toStringListMap(json: String?): Map<String, List<String>>? {
-        if (json == null) return null
-        val type = object : TypeToken<Map<String, List<String>>>() {}.type
-        return gson.fromJson(json, type)
-    }
-}

@@ -20,8 +20,9 @@ import java.util.UUID
 object ResponseParser {
 
     // Regex patterns for parsing model output
+    // Handles both quoted and unquoted action names: do(action="Tap") or do(action=Tap)
     private val ACTION_TYPE_PATTERN = Regex(
-        """do\s*\(\s*action\s*=\s*(\w+(?:\s+\w+)?)""",
+        """do\s*\(\s*action\s*=\s*["']?(\w+(?:\s+\w+)?)["']?""",
         RegexOption.IGNORE_CASE
     )
 

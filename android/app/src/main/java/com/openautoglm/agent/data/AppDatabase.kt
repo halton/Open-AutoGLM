@@ -11,15 +11,10 @@ import com.openautoglm.agent.data.dao.ModelConfigDao
 import com.openautoglm.agent.data.dao.TaskDao
 import com.openautoglm.agent.data.dao.UserPreferencesDao
 import com.openautoglm.agent.data.entities.Action
-import com.openautoglm.agent.data.entities.ActionConverters
 import com.openautoglm.agent.data.entities.AppMapping
-import com.openautoglm.agent.data.entities.AppMappingConverters
 import com.openautoglm.agent.data.entities.ModelConfig
-import com.openautoglm.agent.data.entities.ModelConfigConverters
 import com.openautoglm.agent.data.entities.Task
-import com.openautoglm.agent.data.entities.TaskConverters
 import com.openautoglm.agent.data.entities.UserPreferences
-import com.openautoglm.agent.data.entities.UserPreferencesConverters
 
 /**
  * Room database for the OpenAutoGLM Android agent.
@@ -39,16 +34,10 @@ import com.openautoglm.agent.data.entities.UserPreferencesConverters
         UserPreferences::class,
         ModelConfig::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
-@TypeConverters(
-    TaskConverters::class,
-    ActionConverters::class,
-    AppMappingConverters::class,
-    UserPreferencesConverters::class,
-    ModelConfigConverters::class
-)
+@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun taskDao(): TaskDao

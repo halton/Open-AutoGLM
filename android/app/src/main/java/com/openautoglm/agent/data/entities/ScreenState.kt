@@ -60,12 +60,12 @@ data class ScreenState(
      * Finds clickable UI elements.
      */
     fun findClickableElements(): List<UIElement> =
-        uiElements.filter { it.isClickable }
+        uiElements.filter { it.clickable }
 
     /**
      * Finds a UI element by its ID.
      */
-    fun findElementById(elementId: UUID): UIElement? =
+    fun findElementById(elementId: String): UIElement? =
         uiElements.find { it.id == elementId }
 
     /**

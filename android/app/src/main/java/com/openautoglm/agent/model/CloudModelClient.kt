@@ -340,7 +340,10 @@ class CloudModelClient(
                     addProperty("type", "image_url")
                     add("image_url", JsonObject().apply {
                         addProperty("url", src.imageUrl.url)
-                        addProperty("detail", src.imageUrl.detail.name.lowercase())
+                        // Only add detail if specified (some providers like BigModel don't support it)
+                        src.imageUrl.detail?.let { detail ->
+                            addProperty("detail", detail.name.lowercase())
+                        }
                     })
                 }
             }

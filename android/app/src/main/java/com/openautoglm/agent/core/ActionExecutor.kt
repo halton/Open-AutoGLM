@@ -327,12 +327,55 @@ class ActionExecutor(private val context: Context) {
     }
 
     private suspend fun executeLaunchAppFromAction(action: Action): ActionResult {
-        val packageName = action.parameters.getStringParam("packageName")
+        val appName = action.parameters.getStringParam("app")
+            ?: action.parameters.getStringParam("packageName")
             ?: action.parameters.getStringParam("package_name")
             ?: action.parameters.getStringParam("package")
-            ?: return ActionResult.failure(message = "Missing 'packageName' parameter for LAUNCH action")
+            ?: return ActionResult.failure(message = "Missing 'app' parameter for LAUNCH action")
 
+        // Try to resolve app name to package name
+        val packageName = resolveAppNameToPackage(appName)
         return executeLaunchApp(packageName)
+    }
+
+    /**
+     * Resolves an app name to its package name.
+     * Supports common app names and their package names.
+     */
+    private fun resolveAppNameToPackage(appName: String): String {
+        // If it looks like a package name (contains dots), use it directly
+        if (appName.contains('.')) {
+            return appName
+        }
+
+        // Map common app names to package names
+        val appNameLower = appName.lowercase()
+        return when {
+            appNameLower.contains("chrome") -> "com.android.chrome"
+            appNameLower.contains("settings") || appNameLower.contains("设置") -> "com.android.settings"
+            appNameLower.contains("wechat") || appNameLower.contains("微信") -> "com.tencent.mm"
+            appNameLower.contains("alipay") || appNameLower.contains("支付宝") -> "com.eg.android.AlipayGphone"
+            appNameLower.contains("taobao") || appNameLower.contains("淘宝") -> "com.taobao.taobao"
+            appNameLower.contains("jd") || appNameLower.contains("京东") -> "com.jingdong.app.mall"
+            appNameLower.contains("meituan") || appNameLower.contains("美团") -> "com.sankuai.meituan"
+            appNameLower.contains("douyin") || appNameLower.contains("抖音") -> "com.ss.android.ugc.aweme"
+            appNameLower.contains("weibo") || appNameLower.contains("微博") -> "com.sina.weibo"
+            appNameLower.contains("camera") || appNameLower.contains("相机") -> "com.android.camera"
+            appNameLower.contains("gallery") || appNameLower.contains("相册") -> "com.android.gallery3d"
+            appNameLower.contains("phone") || appNameLower.contains("电话") -> "com.android.dialer"
+            appNameLower.contains("contacts") || appNameLower.contains("联系人") -> "com.android.contacts"
+            appNameLower.contains("message") || appNameLower.contains("短信") -> "com.android.mms"
+            appNameLower.contains("calendar") || appNameLower.contains("日历") -> "com.android.calendar"
+            appNameLower.contains("clock") || appNameLower.contains("时钟") -> "com.android.deskclock"
+            appNameLower.contains("calculator") || appNameLower.contains("计算器") -> "com.android.calculator2"
+            appNameLower.contains("browser") || appNameLower.contains("浏览器") -> "com.android.browser"
+            appNameLower.contains("maps") || appNameLower.contains("地图") -> "com.google.android.apps.maps"
+            appNameLower.contains("youtube") -> "com.google.android.youtube"
+            appNameLower.contains("gmail") -> "com.google.android.gm"
+            appNameLower.contains("play store") -> "com.android.vending"
+            appNameLower.contains("files") || appNameLower.contains("文件") -> "com.android.documentsui"
+            else -> appName // Return original if no match, let the system try to find it
+        }
     }
 
     private suspend fun executeWaitFromAction(action: Action): ActionResult {

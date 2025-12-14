@@ -1008,4 +1008,13 @@ object DefaultAppMappings {
                 mapping.aliases.any { it.lowercase().contains(lowerQuery) }
         }
     }
+
+    /**
+     * Get all default app mappings.
+     *
+     * @return List of all default AppMappings
+     */
+    fun getAllMappings(): List<AppMapping> {
+        return apps
+    }
 }

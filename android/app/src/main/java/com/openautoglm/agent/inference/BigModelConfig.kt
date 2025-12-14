@@ -3,7 +3,7 @@ package com.openautoglm.agent.inference
 /**
  * Configuration for BigModel (ZhipuAI) API integration.
  *
- * BigModel provides the AutoGLM-Phone-9B model specifically designed for
+ * BigModel provides the AutoGLM-Phone model specifically designed for
  * phone automation tasks with vision-language understanding.
  *
  * API Documentation: https://open.bigmodel.cn/dev/api
@@ -22,16 +22,19 @@ object BigModelConfig {
 
     /**
      * Default model ID for phone automation.
-     * AutoGLM-Phone-9B is optimized for Android UI understanding and action planning.
+     * AutoGLM-Phone is optimized for Android UI understanding and action planning.
      */
-    const val DEFAULT_MODEL = "AutoGLM-Phone-9B"
+    const val DEFAULT_MODEL = "AutoGLM-Phone"
 
     /**
      * Alternative models supported by BigModel.
      */
     object Models {
-        /** Main phone automation model (9B parameters) */
-        const val AUTOGLM_PHONE_9B = "AutoGLM-Phone-9B"
+        /** Main phone automation model */
+        const val AUTOGLM_PHONE = "AutoGLM-Phone"
+
+        /** Multilingual phone automation model */
+        const val AUTOGLM_PHONE_MULTILINGUAL = "AutoGLM-Phone-Multilingual"
 
         /** General-purpose vision-language model */
         const val GLM_4V = "glm-4v"
