@@ -240,6 +240,36 @@ object DefaultAppMappings {
         )
         add(
             AppMapping.create(
+                packageName = "com.ctrip.ibu.trip",
+                appName = "Trip.com",
+                category = AppCategory.TRAVEL,
+                zhPrompt = "Trip.com是携程国际版，提供全球酒店、机票、火车票预订",
+                enPrompt = "Trip.com is Ctrip's international platform for hotels, flights, and train bookings",
+                aliases = listOf("trip.com", "Trip", "tripcom")
+            )
+        )
+        add(
+            AppMapping.create(
+                packageName = "com.trainline.android",
+                appName = "Trainline",
+                category = AppCategory.TRAVEL,
+                zhPrompt = "Trainline是欧洲火车票预订平台",
+                enPrompt = "Trainline is a European train ticket booking platform",
+                aliases = listOf("trainline")
+            )
+        )
+        add(
+            AppMapping.create(
+                packageName = "com.amtrak.rider",
+                appName = "Amtrak",
+                category = AppCategory.TRAVEL,
+                zhPrompt = "Amtrak是美国国家铁路客运公司官方应用",
+                enPrompt = "Amtrak is the official app for US national rail service",
+                aliases = listOf("amtrak")
+            )
+        )
+        add(
+            AppMapping.create(
                 packageName = "com.booking",
                 appName = "Booking.com",
                 category = AppCategory.TRAVEL,
