@@ -385,3 +385,225 @@ fun SimpleOrderConfirmationDialog(
         onDismiss = onDismiss
     )
 }
+
+/**
+ * Data class representing a passenger for booking.
+ */
+data class BookingPassenger(
+    val name: String,
+    val idType: String,
+    val seatClass: String,
+    val seatNumber: String? = null
+)
+
+/**
+ * Confirmation dialog for travel bookings (train, flight, etc.).
+ *
+ * Displays booking details including route, date/time, passengers,
+ * and total cost before confirming the booking.
+ */
+@Composable
+fun BookingConfirmationDialog(
+    bookingType: String = "Train",
+    routeFrom: String,
+    routeTo: String,
+    vehicleNumber: String,  // Train number or flight number
+    departureDateTime: String,
+    arrivalDateTime: String,
+    duration: String,
+    passengers: List<BookingPassenger>,
+    totalPrice: String,
+    serviceFee: String? = null,
+    insuranceInfo: String? = null,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Confirm $bookingType Booking",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Route info
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = vehicleNumber,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(
+                                    text = departureDateTime,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = routeFrom,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Column(horizontalAlignment = androidx.compose.ui.Alignment.End) {
+                                Text(
+                                    text = arrivalDateTime,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = routeTo,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                        Text(
+                            text = "Duration: $duration",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+
+                // Passenger info
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Passengers (${passengers.size})",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        passengers.forEach { passenger ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text(
+                                        text = passenger.name,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        text = passenger.idType,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Column(horizontalAlignment = androidx.compose.ui.Alignment.End) {
+                                    Text(
+                                        text = passenger.seatClass,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    passenger.seatNumber?.let {
+                                        Text(
+                                            text = it,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Price breakdown
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        serviceFee?.let {
+                            PriceRow(label = "Service Fee", value = it)
+                        }
+                        insuranceInfo?.let {
+                            PriceRow(label = "Insurance", value = it)
+                        }
+                        Divider(modifier = Modifier.padding(vertical = 4.dp))
+                        PriceRow(
+                            label = "Total",
+                            value = totalPrice,
+                            isBold = true
+                        )
+                    }
+                }
+
+                // Warning
+                Text(
+                    text = "This will submit your booking. Please ensure all information is correct.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onConfirm()
+                    onDismiss()
+                }
+            ) {
+                Text("Confirm Booking")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+/**
+ * Simple booking confirmation with minimal details.
+ */
+@Composable
+fun SimpleBookingConfirmationDialog(
+    bookingType: String = "Train",
+    route: String,
+    dateTime: String,
+    passengerCount: Int,
+    totalPrice: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ConfirmationDialog(
+        title = "Confirm $bookingType Booking",
+        message = "Ready to book your $bookingType ticket?",
+        actionName = "Book Now",
+        details = listOf(
+            "Route" to route,
+            "Date/Time" to dateTime,
+            "Passengers" to "$passengerCount",
+            "Total" to totalPrice
+        ),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss
+    )
+}

@@ -187,25 +187,25 @@
 
 ### Travel App Mappings
 
-- [ ] T074 [P] [US3] Add 12306 (China Railway) app mapping in android/app/src/main/assets/app_mappings.json
-- [ ] T075 [P] [US3] Add Ctrip app mapping in android/app/src/main/assets/app_mappings.json
-- [ ] T076 [P] [US3] Add Trip.com app mapping in android/app/src/main/assets/app_mappings.json
+- [x] T074 [P] [US3] Add 12306 (China Railway) app mapping in android/app/src/main/java/com/openautoglm/agent/knowledge/DefaultAppMappings.kt
+- [x] T075 [P] [US3] Add Ctrip app mapping in android/app/src/main/java/com/openautoglm/agent/knowledge/DefaultAppMappings.kt
+- [x] T076 [P] [US3] Add Trip.com/Trainline/Amtrak app mappings in android/app/src/main/java/com/openautoglm/agent/knowledge/DefaultAppMappings.kt
 
 ### Travel Booking Logic
 
-- [ ] T077 [US3] Implement travel date/time parsing from natural language in android/app/src/main/java/com/openautoglm/agent/agent/TravelDateParser.kt
-- [ ] T078 [US3] Implement train search and comparison logic in android/app/src/main/java/com/openautoglm/agent/agent/TrainSearcher.kt
-- [ ] T079 [US3] Implement seat class selection handling in android/app/src/main/java/com/openautoglm/agent/agent/SeatSelector.kt
-- [ ] T080 [US3] Implement passenger information handling (using saved data) in android/app/src/main/java/com/openautoglm/agent/agent/PassengerManager.kt
+- [x] T077 [US3] Implement travel date/time parsing from natural language in android/app/src/main/java/com/openautoglm/agent/agent/TravelDateParser.kt
+- [x] T078 [US3] Implement train search and comparison logic in android/app/src/main/java/com/openautoglm/agent/agent/TrainSearcher.kt
+- [x] T079 [US3] Implement seat class selection handling in android/app/src/main/java/com/openautoglm/agent/agent/SeatSelector.kt
+- [x] T080 [US3] Implement passenger information handling (using saved data) in android/app/src/main/java/com/openautoglm/agent/agent/PassengerManager.kt
 
 ### Alternative Date Suggestions
 
-- [ ] T081 [US3] Implement date availability detection and alternative suggestions in android/app/src/main/java/com/openautoglm/agent/agent/DateAlternativeSuggester.kt
+- [x] T081 [US3] Implement date availability detection and alternative suggestions in android/app/src/main/java/com/openautoglm/agent/agent/DateAlternativeSuggester.kt
 
 ### Travel Booking UI
 
-- [ ] T082 [US3] Create TrainComparisonCard component in android/app/src/main/java/com/openautoglm/agent/ui/components/TrainComparisonCard.kt
-- [ ] T083 [US3] Create BookingConfirmationDialog in android/app/src/main/java/com/openautoglm/agent/ui/components/BookingConfirmationDialog.kt
+- [x] T082 [US3] Create TrainComparisonCard component in android/app/src/main/java/com/openautoglm/agent/ui/components/TrainComparisonCard.kt
+- [x] T083 [US3] Create BookingConfirmationDialog in android/app/src/main/java/com/openautoglm/agent/ui/components/ConfirmationDialog.kt
 
 **Checkpoint**: User Story 3 complete - train booking functional
 
