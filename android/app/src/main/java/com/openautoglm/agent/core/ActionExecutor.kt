@@ -39,14 +39,16 @@ class ActionExecutor(private val context: Context) {
     private var screenHeight: Int = 0
 
     init {
-        // Get screen dimensions
+        // Get screen dimensions - MUST use getRealMetrics to match ScreenCaptureManager
+        // getRealMetrics returns full physical screen including status bar and navigation bar
+        // This ensures coordinate conversion matches what the VLM sees in screenshots
         val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val displayMetrics = DisplayMetrics()
         @Suppress("DEPRECATION")
-        windowManager.defaultDisplay.getMetrics(displayMetrics)
+        windowManager.defaultDisplay.getRealMetrics(displayMetrics)
         screenWidth = displayMetrics.widthPixels
         screenHeight = displayMetrics.heightPixels
-        android.util.Log.i("ActionExecutor", "Screen dimensions: ${screenWidth}x${screenHeight}")
+        android.util.Log.i("ActionExecutor", "Screen dimensions (real): ${screenWidth}x${screenHeight}")
     }
 
     /**
@@ -212,10 +214,16 @@ class ActionExecutor(private val context: Context) {
      * @return ActionResult indicating success or failure
      */
     suspend fun executeHome(): ActionResult {
+        android.util.Log.i("ActionExecutor", "executeHome called")
         val service = getAccessibilityService()
-            ?: return ActionResult.failure(message = "AccessibilityService not available")
+        if (service == null) {
+            android.util.Log.e("ActionExecutor", "AccessibilityService not available for HOME action")
+            return ActionResult.failure(message = "AccessibilityService not available")
+        }
 
+        android.util.Log.i("ActionExecutor", "Calling performHome on AccessibilityService")
         val success = service.performHome()
+        android.util.Log.i("ActionExecutor", "performHome returned: $success")
         delay(DEFAULT_WAIT_AFTER_ACTION_MS)
 
         return if (success) {
@@ -429,15 +437,32 @@ class ActionExecutor(private val context: Context) {
         // Map common app names to package names
         val appNameLower = appName.lowercase()
         return when {
-            appNameLower.contains("chrome") -> "com.android.chrome"
-            appNameLower.contains("settings") || appNameLower.contains("设置") -> "com.android.settings"
-            appNameLower.contains("wechat") || appNameLower.contains("微信") -> "com.tencent.mm"
-            appNameLower.contains("alipay") || appNameLower.contains("支付宝") -> "com.eg.android.AlipayGphone"
+            // Travel & Train booking
+            appNameLower.contains("12306") || appNameLower.contains("铁路") -> "com.MobileTicket"
+            appNameLower.contains("ctrip") || appNameLower.contains("携程") -> "ctrip.android.view"
+            appNameLower.contains("trip.com") -> "com.ctrip.ibu.trip"
+            appNameLower.contains("qunar") || appNameLower.contains("去哪儿") -> "com.Qunar"
+
+            // Food & Local services
+            appNameLower.contains("dianping") || appNameLower.contains("点评") || appNameLower.contains("大众点评") -> "com.dianping.v1"
+            appNameLower.contains("meituan") || appNameLower.contains("美团") -> "com.sankuai.meituan"
+            appNameLower.contains("eleme") || appNameLower.contains("饿了么") -> "me.ele"
+
+            // E-commerce
             appNameLower.contains("taobao") || appNameLower.contains("淘宝") -> "com.taobao.taobao"
             appNameLower.contains("jd") || appNameLower.contains("京东") -> "com.jingdong.app.mall"
-            appNameLower.contains("meituan") || appNameLower.contains("美团") -> "com.sankuai.meituan"
+            appNameLower.contains("pinduoduo") || appNameLower.contains("拼多多") -> "com.xunmeng.pinduoduo"
+
+            // Social & Messaging
+            appNameLower.contains("wechat") || appNameLower.contains("微信") -> "com.tencent.mm"
+            appNameLower.contains("alipay") || appNameLower.contains("支付宝") -> "com.eg.android.AlipayGphone"
             appNameLower.contains("douyin") || appNameLower.contains("抖音") -> "com.ss.android.ugc.aweme"
             appNameLower.contains("weibo") || appNameLower.contains("微博") -> "com.sina.weibo"
+            appNameLower.contains("qq") && !appNameLower.contains("mail") -> "com.tencent.mobileqq"
+
+            // System apps
+            appNameLower.contains("chrome") -> "com.android.chrome"
+            appNameLower.contains("settings") || appNameLower.contains("设置") -> "com.android.settings"
             appNameLower.contains("camera") || appNameLower.contains("相机") -> "com.android.camera"
             appNameLower.contains("gallery") || appNameLower.contains("相册") -> "com.android.gallery3d"
             appNameLower.contains("phone") || appNameLower.contains("电话") -> "com.android.dialer"

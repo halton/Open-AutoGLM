@@ -221,8 +221,10 @@ class PhoneAgent(
             // On first step, go to home screen first so the model doesn't see the app's own UI
             if (isFirst) {
                 Log.i(TAG, "First step: Going to home screen before capturing screenshot")
-                actionExecutor.executeHome()
-                kotlinx.coroutines.delay(500) // Wait for home screen to appear
+                val homeResult = actionExecutor.executeHome()
+                Log.i(TAG, "Home action result: success=${homeResult.success}, message=${homeResult.message}")
+                kotlinx.coroutines.delay(1000) // Wait for home screen to appear (increased from 500ms)
+                Log.i(TAG, "Delay complete, now capturing screenshot")
             }
 
             // Capture current screen state
