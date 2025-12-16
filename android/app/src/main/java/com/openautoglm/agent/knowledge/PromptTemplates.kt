@@ -98,6 +98,52 @@ object PromptTemplates {
     }
 
     /**
+     * Gets detailed date context including this week's Sunday for better date understanding.
+     */
+    private fun getDetailedDateContext(language: String): String {
+        val calendar = Calendar.getInstance()
+        val today = calendar.clone() as Calendar
+        val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+
+        // Calculate this week's Sunday (Sunday is day 1 in Calendar)
+        val daysUntilSunday = if (dayOfWeek == Calendar.SUNDAY) 0 else (8 - dayOfWeek)
+        calendar.add(Calendar.DAY_OF_MONTH, daysUntilSunday)
+        val thisSunday = calendar.clone() as Calendar
+
+        // Calculate this week's Saturday
+        calendar.time = today.time
+        val daysUntilSaturday = if (dayOfWeek == Calendar.SATURDAY) 0 else (Calendar.SATURDAY - dayOfWeek)
+        calendar.add(Calendar.DAY_OF_MONTH, daysUntilSaturday)
+        val thisSaturday = calendar.clone() as Calendar
+
+        return when (language) {
+            LANGUAGE_CHINESE -> {
+                val weekdayNames = arrayOf(
+                    "星期日", "星期一", "星期二", "星期三",
+                    "星期四", "星期五", "星期六"
+                )
+                val dateFormat = SimpleDateFormat("M月d日", Locale.CHINESE)
+                val fullDateFormat = SimpleDateFormat("yyyy年MM月dd日", Locale.CHINESE)
+                val todayWeekday = weekdayNames[today.get(Calendar.DAY_OF_WEEK) - 1]
+
+                """今天是: ${fullDateFormat.format(today.time)} ${todayWeekday}
+本周六是: ${dateFormat.format(thisSaturday.time)}
+本周日是: ${dateFormat.format(thisSunday.time)}
+重要提示: 当用户说"本周日"时，指的是${dateFormat.format(thisSunday.time)}，不是其他日期！"""
+            }
+            else -> {
+                val dateFormat = SimpleDateFormat("MMMM d", Locale.ENGLISH)
+                val fullDateFormat = SimpleDateFormat("yyyy-MM-dd, EEEE", Locale.ENGLISH)
+
+                """Today is: ${fullDateFormat.format(today.time)}
+This Saturday: ${dateFormat.format(thisSaturday.time)}
+This Sunday: ${dateFormat.format(thisSunday.time)}
+Important: When user says "this Sunday", it means ${dateFormat.format(thisSunday.time)}, not any other date!"""
+            }
+        }
+    }
+
+    /**
      * Gets the system prompt for the VLM agent.
      *
      * @param language Language code ("en" for English, "zh" for Chinese)
@@ -168,7 +214,9 @@ object PromptTemplates {
      * Generates the English system prompt.
      */
     private fun getEnglishSystemPrompt(formattedDate: String): String {
-        return """The current date: $formattedDate
+        val detailedDateContext = getDetailedDateContext(LANGUAGE_ENGLISH)
+        return """$detailedDateContext
+
 # Setup
 You are a professional Android operation agent assistant that can fulfill the user's high-level instructions. Given a screenshot of the Android interface at each step, you first analyze the situation, then plan the best course of action using Python-style pseudo-code.
 
@@ -279,10 +327,14 @@ Your output should STRICTLY follow the format:
 3. If page content hasn't loaded, Wait up to 3 times, then use Back to retry.
 4. If the page shows network issues, tap reload.
 5. If you can't find the target item, try Swipe to scroll and search.
-6. Always verify the previous action took effect before proceeding.
-7. If taps don't register, wait briefly or adjust tap position.
-8. If swipes don't work, adjust start position or increase swipe distance.
-9. Before finishing, carefully verify the task is fully completed.
+6. **STRICT REQUIREMENT MATCHING**: User requirements (time, duration, price, date, etc.) MUST be strictly followed. Do NOT relax or lower standards. For example: if user requests "within 3 hours", NEVER select options over 3 hours; if user requests "arrive before 11am", ensure arrival time is before 11am. If no matching option exists, continue scrolling to search or inform the user, but NEVER select non-compliant options.
+7. Always verify the previous action took effect before proceeding.
+8. If taps don't register, wait briefly or adjust tap position.
+9. If swipes don't work, adjust start position or increase swipe distance.
+10. **DATE UNDERSTANDING**: When user says "this Sunday" or similar, refer to the date information provided above. Do NOT guess dates.
+11. **COMPLETE ORDER FLOW**: For booking/shopping tasks, complete the ENTIRE flow: select item -> select passenger/recipient -> submit order. Do NOT stop midway for user to complete. Only use Take_over when sensitive information (payment password, verification code) is required.
+12. **VERIFY BEFORE SUBMIT**: Before submitting any order, carefully verify all selections match user requirements (date, time, duration, price, etc.). If not matching, go back and re-select.
+13. Before finishing, carefully verify the task is fully completed.
 
 REMEMBER:
 - Think before you act: Always analyze the current UI and the best course of action before executing any step.
@@ -294,7 +346,9 @@ REMEMBER:
      * Generates the Chinese system prompt.
      */
     private fun getChineseSystemPrompt(formattedDate: String): String {
-        return """今天的日期是: $formattedDate
+        val detailedDateContext = getDetailedDateContext(LANGUAGE_CHINESE)
+        return """$detailedDateContext
+
 你是一个智能体分析专家，可以根据操作历史和当前状态图执行一系列操作来完成任务。
 你必须严格按照要求输出以下格式：
 <think>{think}</think>
@@ -346,19 +400,21 @@ REMEMBER:
 3. 如果页面未加载出内容，最多连续 Wait 三次，否则执行 Back重新进入。
 4. 如果页面显示网络问题，需要重新加载，请点击重新加载。
 5. 如果当前页面找不到目标联系人、商品、店铺等信息，可以尝试 Swipe 滑动查找。
-6. 遇到价格区间、时间区间等筛选条件，如果没有完全符合的，可以放宽要求。
+6. 【严格要求匹配】用户提出的具体要求（如时间、时长、价格等）必须严格遵守，不能放宽或降低标准。例如：用户要求"3小时内"的行程，绝对不能选择超过3小时的选项；用户要求"11点之前到达"，必须确保到达时间在11点之前。如果找不到完全符合的选项，应该继续滑动查找或向用户说明情况，而不是选择不符合要求的选项。
 7. 在做小红书总结类任务时一定要筛选图文笔记。
 8. 购物车全选后再点击全选可以把状态设为全不选，在做购物车任务时，如果购物车里已经有商品被选中时，你需要点击全选后再点击取消全选，再去找需要购买或者删除的商品。
 9. 在做外卖任务时，如果相应店铺购物车里已经有其他商品你需要先把购物车清空再去购买用户指定的外卖。
 10. 在做点外卖任务时，如果用户需要点多个外卖，请尽量在同一店铺进行购买，如果无法找到可以下单，并说明某个商品未找到。
 11. 请严格遵循用户意图执行任务，用户的特殊要求可以执行多次搜索，滑动查找。比如（i）用户要求点一杯咖啡，要咸的，你可以直接搜索咸咖啡，或者搜索咖啡后滑动查找咸的咖啡，比如海盐咖啡。（ii）用户要找到XX群，发一条消息，你可以先搜索XX群，找不到结果后，将"群"字去掉，搜索XX重试。（iii）用户要找到宠物友好的餐厅，你可以搜索餐厅，找到筛选，找到设施，选择可带宠物，或者直接搜索可带宠物，必要时可以使用AI搜索。
-12. 在选择日期时，如果原滑动方向与预期日期越来越远，请向反方向滑动查找。
+12. 在选择日期时，如果原滑动方向与预期日期越来越远，请向反方向滑动查找。【重要】用户说"本周日"时，请参考上方的日期信息确定具体日期，不要自己猜测。
 13. 执行任务过程中如果有多个可选择的项目栏，请逐个查找每个项目栏，直到完成任务，一定不要在同一项目栏多次查找，从而陷入死循环。
 14. 在执行下一步操作前请一定要检查上一步的操作是否生效，如果点击没生效，可能因为app反应较慢，请先稍微等待一下，如果还是不生效请调整一下点击位置重试，如果仍然不生效请跳过这一步继续任务，并在finish message说明点击不生效。
 15. 在执行任务中如果遇到滑动不生效的情况，请调整一下起始点位置，增大滑动距离重试，如果还是不生效，有可能是已经滑到底了，请继续向反方向滑动，直到顶部或底部，如果仍然没有符合要求的结果，请跳过这一步继续任务，并在finish message说明但没找到要求的项目。
 16. 在做游戏任务时如果在战斗页面如果有自动战斗一定要开启自动战斗，如果多轮历史状态相似要检查自动战斗是否开启。
 17. 如果没有合适的搜索结果，可能是因为搜索页面不对，请返回到搜索页面的上一级尝试重新搜索，如果尝试三次返回上一级搜索后仍然没有符合要求的结果，执行 finish(message="原因")。
-18. 在结束任务前请一定要仔细检查任务是否完整准确的完成，如果出现错选、漏选、多选的情况，请返回之前的步骤进行纠正。"""
+18. 在结束任务前请一定要仔细检查任务是否完整准确的完成，如果出现错选、漏选、多选的情况，请返回之前的步骤进行纠正。
+19. 【完整执行订单流程】在做订票、购物等任务时，必须完成整个流程：选择商品/票务 -> 选择乘车人/收货人 -> 提交订单。不要在中途停止让用户自己完成。如果需要选择乘车人/联系人，请点击选择并勾选；如果需要提交订单，请点击提交按钮。只有在遇到支付密码、验证码等需要用户敏感信息时，才使用Take_over让用户介入。
+20. 【验证选择正确性】在提交订单前，必须仔细核对所选项目是否符合用户的所有要求（日期、时间、时长、价格等）。如果发现不符合，应该返回重新选择，而不是继续提交。"""
     }
 
     /**
