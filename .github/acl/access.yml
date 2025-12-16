@@ -1,0 +1,30 @@
+# Documentation for ACL policy: https://aka.ms/gim/docs/policy/acl
+
+name: Access control list
+description: List of teams and their permission levels
+resource: repository
+where:
+configuration:
+  manageAccess:
+  - team: edgechinaawmdev
+    role: Pull
+  - member: qunmi
+    role: Maintain
+  - member: haltonhuo
+    role: Maintain
+  - team: edgemobilegrowthdevs
+    role: Pull
+  - team: edgecentfunappddevs
+    role: Pull
+  - team: edgemobilecore
+    role: Pull
+  - team: edgemobilefudamental
+    role: Pull
+  - team: edgecwebdevs
+    role: Pull
+  - team: wv2mac
+    role: Pull
+  - team: webgraphicschina
+    role: Pull
+  - team: edge-china-es
+    role: Pull
