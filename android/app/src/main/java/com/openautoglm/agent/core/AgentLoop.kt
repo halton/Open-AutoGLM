@@ -42,6 +42,7 @@ class AgentLoop(
     companion object {
         private const val TAG = "AgentLoop"
         private const val DEFAULT_STEP_DELAY_MS = 500L
+        private const val BACKGROUND_TRANSITION_DELAY_MS = 500L
     }
 
     /**
@@ -180,6 +181,19 @@ class AgentLoop(
             progressCallback?.onStepStarted(stepNumber, currentTask)
 
             Log.d(TAG, "Executing step $stepNumber for task ${currentTask.id}")
+
+            // Step 0: On first step, send app to background to avoid self-referential loop
+            // This ensures the VLM sees the actual phone screen, not the AutoGLM app UI
+            if (stepNumber == 1) {
+                Log.i(TAG, "First step: sending app to background before screen capture")
+                try {
+                    actionExecutor.executeHome()
+                    kotlinx.coroutines.delay(BACKGROUND_TRANSITION_DELAY_MS)
+                    Log.i(TAG, "App sent to background, proceeding with screen capture")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to send app to background: ${e.message}, continuing anyway")
+                }
+            }
 
             // Step 1: Capture screen state
             _state.value = AgentLoopState.CapturingScreen(stepNumber, currentTask.id)
