@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- AutoGLM logo - stylized "A" with circuit pattern -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30L34,78L40,78L44,68L64,68L68,78L74,78L54,30ZM46,62L54,42L62,62L46,62Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,54L24,54L24,60L30,60L30,54Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M78,54L84,54L84,60L78,60L78,54Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M51,24L51,18L57,18L57,24L51,24Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M51,84L51,90L57,90L57,84L51,84Z"/>
+</vector>
