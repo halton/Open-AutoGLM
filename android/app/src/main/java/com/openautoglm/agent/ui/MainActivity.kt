@@ -38,6 +38,7 @@ import androidx.navigation.compose.rememberNavController
 import com.openautoglm.agent.R
 import com.openautoglm.agent.accessibility.ScreenCaptureManager
 import com.openautoglm.agent.ui.screens.HistoryScreen
+import com.openautoglm.agent.ui.screens.ModelDownloadScreen
 import com.openautoglm.agent.ui.screens.SettingsScreen
 import com.openautoglm.agent.ui.screens.TaskScreen
 import com.openautoglm.agent.ui.theme.AutoGLMTheme
@@ -217,7 +218,18 @@ fun NavigationHost(
             HistoryScreen()
         }
         composable(Screen.Settings.route) {
-            SettingsScreen()
+            SettingsScreen(
+                onNavigateToModelDownload = {
+                    navController.navigate("model_download")
+                }
+            )
+        }
+        composable("model_download") {
+            ModelDownloadScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                }
+            )
         }
     }
 }
