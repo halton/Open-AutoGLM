@@ -115,6 +115,11 @@ dependencies {
     // MediaPipe vision tasks for BitmapImageBuilder (image conversion)
     implementation("com.google.mediapipe:tasks-vision:0.10.20")
 
+    // On-device ML Inference using llama.cpp for GGUF models
+    // Supports AutoGLM-Phone-9B and other GGUF quantized models
+    // NOTE: llama.cpp native library (.so files) must be added manually to app/libs/
+    // Build instructions: https://github.com/ggml-org/llama.cpp/blob/master/docs/android.md
+
     // WorkManager for background model downloads
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
