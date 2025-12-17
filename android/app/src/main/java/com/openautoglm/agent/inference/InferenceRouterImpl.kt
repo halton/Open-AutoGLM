@@ -83,8 +83,13 @@ class InferenceRouterImpl(
     }
 
     // Inference clients
-    private var onDeviceInference: OnDeviceInference? = null
+    // Prefer llama.cpp (AutoGLM GGUF) over MediaPipe (Gemma)
+    private var llamaCppInference: LlamaCppInference? = null
+    private var mediaPipeInference: OnDeviceInference? = null
     private var cloudInference: CloudInference? = null
+
+    // Model download manager for checking available models
+    private val modelDownloadManager = ModelDownloadManager(context)
 
     // Client cache
     private val clientMutex = Mutex()
@@ -210,15 +215,80 @@ class InferenceRouterImpl(
     }
 
     /**
-     * Gets or creates the on-device inference client.
+     * Gets or creates the best available on-device inference client.
+     * Prefers llama.cpp (AutoGLM GGUF) over MediaPipe (Gemma) for better quality.
+     *
+     * Priority order:
+     * 1. llama.cpp with AutoGLM-Phone GGUF (same as cloud API)
+     * 2. MediaPipe with Gemma (fallback for lower-end devices)
      */
-    private suspend fun getOnDeviceClient(): OnDeviceInference? {
+    private suspend fun getOnDeviceClient(): com.openautoglm.agent.model.ModelClient? {
         return clientMutex.withLock {
-            if (onDeviceInference == null) {
-                onDeviceInference = OnDeviceInference(context)
+            // First try llama.cpp (GGUF models like AutoGLM-Phone)
+            val ggufPath = modelDownloadManager.getGgufModelPath()
+            if (ggufPath != null) {
+                if (llamaCppInference == null) {
+                    llamaCppInference = LlamaCppInference(context)
+                }
+                if (llamaCppInference?.isAvailable() == true) {
+                    Log.i(TAG, "Using llama.cpp with GGUF model: $ggufPath")
+                    return@withLock llamaCppInference
+                }
             }
-            if (onDeviceInference?.isAvailable() == true) {
-                onDeviceInference
+
+            // Fallback to MediaPipe (Gemma .task models)
+            val mediaPipePath = modelDownloadManager.getMediaPipeModelPath()
+            if (mediaPipePath != null) {
+                if (mediaPipeInference == null) {
+                    mediaPipeInference = OnDeviceInference(context)
+                }
+                if (mediaPipeInference?.isAvailable() == true) {
+                    Log.i(TAG, "Using MediaPipe with model: $mediaPipePath")
+                    return@withLock mediaPipeInference
+                }
+            }
+
+            Log.w(TAG, "No on-device model available")
+            null
+        }
+    }
+
+    /**
+     * Gets the llama.cpp client specifically (for GGUF models).
+     */
+    private suspend fun getLlamaCppClient(): LlamaCppInference? {
+        return clientMutex.withLock {
+            val ggufPath = modelDownloadManager.getGgufModelPath()
+            if (ggufPath == null) {
+                return@withLock null
+            }
+
+            if (llamaCppInference == null) {
+                llamaCppInference = LlamaCppInference(context)
+            }
+            if (llamaCppInference?.isAvailable() == true) {
+                llamaCppInference
+            } else {
+                null
+            }
+        }
+    }
+
+    /**
+     * Gets the MediaPipe client specifically (for .task models).
+     */
+    private suspend fun getMediaPipeClient(): OnDeviceInference? {
+        return clientMutex.withLock {
+            val mediaPipePath = modelDownloadManager.getMediaPipeModelPath()
+            if (mediaPipePath == null) {
+                return@withLock null
+            }
+
+            if (mediaPipeInference == null) {
+                mediaPipeInference = OnDeviceInference(context)
+            }
+            if (mediaPipeInference?.isAvailable() == true) {
+                mediaPipeInference
             } else {
                 null
             }
@@ -349,9 +419,26 @@ class InferenceRouterImpl(
 
     /**
      * Checks if on-device inference is available.
+     * Returns true if either llama.cpp (GGUF) or MediaPipe is available.
      */
     suspend fun isOnDeviceAvailable(): Boolean {
         val client = getOnDeviceClient()
+        return client != null
+    }
+
+    /**
+     * Checks if llama.cpp (GGUF) inference is available.
+     */
+    suspend fun isLlamaCppAvailable(): Boolean {
+        val client = getLlamaCppClient()
+        return client?.isAvailable() == true
+    }
+
+    /**
+     * Checks if MediaPipe inference is available.
+     */
+    suspend fun isMediaPipeAvailable(): Boolean {
+        val client = getMediaPipeClient()
         return client?.isAvailable() == true
     }
 
@@ -369,8 +456,11 @@ class InferenceRouterImpl(
     suspend fun getAvailableBackends(): List<String> {
         val backends = mutableListOf<String>()
 
-        if (isOnDeviceAvailable()) {
-            backends.add("ON_DEVICE")
+        if (isLlamaCppAvailable()) {
+            backends.add("LLAMA_CPP")
+        }
+        if (isMediaPipeAvailable()) {
+            backends.add("MEDIAPIPE")
         }
         if (isCloudConfigured()) {
             backends.add("CLOUD")
@@ -380,11 +470,30 @@ class InferenceRouterImpl(
     }
 
     /**
+     * Gets info about the current on-device model.
+     */
+    fun getCurrentOnDeviceModelInfo(): String? {
+        val ggufPath = modelDownloadManager.getGgufModelPath()
+        if (ggufPath != null) {
+            return "llama.cpp: ${java.io.File(ggufPath).name}"
+        }
+
+        val mediaPipePath = modelDownloadManager.getMediaPipeModelPath()
+        if (mediaPipePath != null) {
+            return "MediaPipe: ${java.io.File(mediaPipePath).name}"
+        }
+
+        return null
+    }
+
+    /**
      * Releases resources.
      */
     fun release() {
-        onDeviceInference?.release()
-        onDeviceInference = null
+        llamaCppInference?.release()
+        llamaCppInference = null
+        mediaPipeInference?.release()
+        mediaPipeInference = null
         cloudInference = null
     }
 }

@@ -26,10 +26,9 @@ import java.util.concurrent.TimeUnit
 /**
  * Manages downloading and storage of on-device ML models.
  *
- * Supports MediaPipe LLM Inference API compatible models in .task format.
- * Models are downloaded from Hugging Face and stored locally.
- *
  * Supports:
+ * - MediaPipe LLM Inference API compatible models (.task format)
+ * - llama.cpp compatible models (.gguf format) including AutoGLM-Phone-9B
  * - Background downloads using WorkManager
  * - Progress tracking
  * - Resume capability for interrupted downloads
@@ -45,9 +44,56 @@ class ModelDownloadManager(
         private const val MODELS_DIR = "models"
         private const val WORK_NAME_PREFIX = "model_download_"
 
-        // MediaPipe-compatible models (.task format)
-        // These models work with com.google.mediapipe:tasks-genai
+        // All available models (both MediaPipe .task and llama.cpp .gguf)
         val AVAILABLE_MODELS = mapOf(
+            // ========== AutoGLM-Phone GGUF Models (llama.cpp) ==========
+            // These are the SAME model as the cloud API, just quantized for on-device
+
+            // AutoGLM-Phone-9B Q4_K_M - RECOMMENDED for Pixel 9 Pro Fold (16GB RAM)
+            "autoglm-9b-q4km" to ModelInfo(
+                id = "autoglm-9b-q4km",
+                displayName = "AutoGLM-Phone 9B (Q4_K_M)",
+                fileName = "AutoGLM-Phone-9B-Multilingual.Q4_K_M.gguf",
+                downloadUrl = "https://huggingface.co/Triangle104/AutoGLM-Phone-9B-Multilingual-GGUF/resolve/main/AutoGLM-Phone-9B-Multilingual.Q4_K_M.gguf",
+                sizeBytes = 6_170_000_000L, // ~6.17GB
+                minRamMB = 8192, // 8GB RAM minimum
+                description = "RECOMMENDED - Same as cloud API, best quality/size balance",
+                descriptionZh = "推荐 - 与云端API相同的模型，质量/大小最佳平衡",
+                supportsVision = true,
+                format = ModelFormat.GGUF
+            ),
+
+            // AutoGLM-Phone-9B Q2_K - Smaller, faster, lower quality
+            "autoglm-9b-q2k" to ModelInfo(
+                id = "autoglm-9b-q2k",
+                displayName = "AutoGLM-Phone 9B (Q2_K)",
+                fileName = "AutoGLM-Phone-9B-Multilingual.Q2_K.gguf",
+                downloadUrl = "https://huggingface.co/Triangle104/AutoGLM-Phone-9B-Multilingual-GGUF/resolve/main/AutoGLM-Phone-9B-Multilingual.Q2_K.gguf",
+                sizeBytes = 4_040_000_000L, // ~4.04GB
+                minRamMB = 6144, // 6GB RAM minimum
+                description = "Smaller model, faster inference, lower quality",
+                descriptionZh = "更小的模型，推理更快，质量较低",
+                supportsVision = true,
+                format = ModelFormat.GGUF
+            ),
+
+            // AutoGLM-Phone-9B Q6_K - Higher quality, larger
+            "autoglm-9b-q6k" to ModelInfo(
+                id = "autoglm-9b-q6k",
+                displayName = "AutoGLM-Phone 9B (Q6_K)",
+                fileName = "AutoGLM-Phone-9B-Multilingual.Q6_K.gguf",
+                downloadUrl = "https://huggingface.co/Triangle104/AutoGLM-Phone-9B-Multilingual-GGUF/resolve/main/AutoGLM-Phone-9B-Multilingual.Q6_K.gguf",
+                sizeBytes = 7_750_000_000L, // ~7.75GB
+                minRamMB = 10240, // 10GB RAM minimum
+                description = "Higher quality, requires more RAM",
+                descriptionZh = "质量更高，需要更多内存",
+                supportsVision = true,
+                format = ModelFormat.GGUF
+            ),
+
+            // ========== Gemma MediaPipe Models (.task format) ==========
+            // These are fallback options for devices that can't run AutoGLM
+
             // Gemma 3 1B - Best balance of size and capability
             "gemma3-1b-int4" to ModelInfo(
                 id = "gemma3-1b-int4",
@@ -56,9 +102,10 @@ class ModelDownloadManager(
                 downloadUrl = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.task",
                 sizeBytes = 700_000_000L, // ~700MB
                 minRamMB = 2048,
-                description = "Recommended - Compact model with good performance",
-                descriptionZh = "推荐 - 紧凑模型，性能良好",
-                supportsVision = false
+                description = "Fallback - Compact model for low-end devices",
+                descriptionZh = "备选 - 适用于低端设备的紧凑模型",
+                supportsVision = false,
+                format = ModelFormat.MEDIAPIPE
             ),
             // Gemma 3 1B INT8 - Higher quality
             "gemma3-1b-int8" to ModelInfo(
@@ -68,9 +115,10 @@ class ModelDownloadManager(
                 downloadUrl = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/Gemma3-1B-IT_multi-prefill-seq_q8_ekv1280.task",
                 sizeBytes = 1_200_000_000L, // ~1.2GB
                 minRamMB = 3072,
-                description = "Higher quality with INT8 quantization",
-                descriptionZh = "INT8量化，质量更高",
-                supportsVision = false
+                description = "Fallback - Higher quality Gemma for mid-range devices",
+                descriptionZh = "备选 - 适用于中端设备的高质量Gemma",
+                supportsVision = false,
+                format = ModelFormat.MEDIAPIPE
             ),
             // Gemma 3 1B with larger context
             "gemma3-1b-int4-4k" to ModelInfo(
@@ -80,9 +128,10 @@ class ModelDownloadManager(
                 downloadUrl = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/Gemma3-1B-IT_multi-prefill-seq_q4_block128_ekv4096.task",
                 sizeBytes = 800_000_000L, // ~800MB
                 minRamMB = 3072,
-                description = "INT4 with extended 4096 token context",
-                descriptionZh = "INT4量化，支持4096 token上下文",
-                supportsVision = false
+                description = "Fallback - INT4 with extended 4096 token context",
+                descriptionZh = "备选 - INT4量化，支持4096 token上下文",
+                supportsVision = false,
+                format = ModelFormat.MEDIAPIPE
             )
         )
     }
@@ -134,17 +183,74 @@ class ModelDownloadManager(
 
     /**
      * Gets any available model file path (first downloaded model found).
+     * Prefers GGUF models (AutoGLM) over MediaPipe models.
      */
     fun getAnyModelPath(): String? {
-        // First check for known models
-        for (model in AVAILABLE_MODELS.values) {
+        // First check for GGUF models (preferred)
+        for (model in AVAILABLE_MODELS.values.filter { it.isGguf }) {
             val modelFile = File(modelsDir, model.fileName)
             if (modelFile.exists() && modelFile.length() > 0) {
                 return modelFile.absolutePath
             }
         }
 
+        // Then check for MediaPipe models
+        for (model in AVAILABLE_MODELS.values.filter { it.isMediaPipe }) {
+            val modelFile = File(modelsDir, model.fileName)
+            if (modelFile.exists() && modelFile.length() > 0) {
+                return modelFile.absolutePath
+            }
+        }
+
+        // Then check for any .gguf file
+        val ggufFiles = modelsDir.listFiles { file ->
+            file.extension.equals("gguf", ignoreCase = true) && file.length() > 0
+        }
+        if (!ggufFiles.isNullOrEmpty()) {
+            return ggufFiles.first().absolutePath
+        }
+
         // Then check for any .task file
+        val taskFiles = modelsDir.listFiles { file ->
+            file.extension.equals("task", ignoreCase = true) && file.length() > 0
+        }
+        return taskFiles?.firstOrNull()?.absolutePath
+    }
+
+    /**
+     * Gets available GGUF model for llama.cpp inference.
+     */
+    fun getGgufModelPath(): String? {
+        // Check for GGUF models in order of preference
+        val ggufOrder = listOf("autoglm-9b-q4km", "autoglm-9b-q6k", "autoglm-9b-q2k")
+        for (modelId in ggufOrder) {
+            val model = AVAILABLE_MODELS[modelId] ?: continue
+            val modelFile = File(modelsDir, model.fileName)
+            if (modelFile.exists() && modelFile.length() > 0) {
+                return modelFile.absolutePath
+            }
+        }
+
+        // Check for any .gguf file
+        val ggufFiles = modelsDir.listFiles { file ->
+            file.extension.equals("gguf", ignoreCase = true) && file.length() > 0
+        }
+        return ggufFiles?.firstOrNull()?.absolutePath
+    }
+
+    /**
+     * Gets available MediaPipe model for MediaPipe inference.
+     */
+    fun getMediaPipeModelPath(): String? {
+        // Check for MediaPipe models
+        for (model in AVAILABLE_MODELS.values.filter { it.isMediaPipe }) {
+            val modelFile = File(modelsDir, model.fileName)
+            if (modelFile.exists() && modelFile.length() > 0) {
+                return modelFile.absolutePath
+            }
+        }
+
+        // Check for any .task file
         val taskFiles = modelsDir.listFiles { file ->
             file.extension.equals("task", ignoreCase = true) && file.length() > 0
         }
@@ -268,14 +374,35 @@ class ModelDownloadManager(
 
     /**
      * Gets the recommended model for the current device.
+     * Prefers AutoGLM-Phone for high-end devices (8GB+ RAM).
      */
     fun getRecommendedModel(): ModelInfo {
         val availableRam = Runtime.getRuntime().maxMemory() / (1024 * 1024)
 
         return when {
+            // High-end device (8GB+ RAM) - use AutoGLM-Phone Q4_K_M (same as cloud API)
+            availableRam >= 8192 -> AVAILABLE_MODELS["autoglm-9b-q4km"]!!
+            // Mid-high device (6GB+ RAM) - use AutoGLM-Phone Q2_K (smaller)
+            availableRam >= 6144 -> AVAILABLE_MODELS["autoglm-9b-q2k"]!!
+            // Mid-range device (3GB+ RAM) - use Gemma INT8
             availableRam >= 3072 -> AVAILABLE_MODELS["gemma3-1b-int8"]!!
+            // Low-end device - use Gemma INT4
             else -> AVAILABLE_MODELS["gemma3-1b-int4"]!!
         }
+    }
+
+    /**
+     * Gets GGUF models only (for llama.cpp).
+     */
+    fun getGgufModels(): List<ModelInfo> {
+        return AVAILABLE_MODELS.values.filter { it.isGguf }
+    }
+
+    /**
+     * Gets MediaPipe models only.
+     */
+    fun getMediaPipeModels(): List<ModelInfo> {
+        return AVAILABLE_MODELS.values.filter { it.isMediaPipe }
     }
 
     private fun updateDownloadState(modelId: String, state: DownloadState) {
@@ -295,7 +422,7 @@ class ModelDownloadManager(
     fun getTotalModelSizeMB(): Long {
         var total = 0L
         modelsDir.listFiles()?.forEach { file ->
-            if (file.extension == "task") {
+            if (file.extension == "task" || file.extension == "gguf") {
                 total += file.length()
             }
         }
@@ -316,6 +443,16 @@ class ModelDownloadManager(
 }
 
 /**
+ * Model format for inference engine selection.
+ */
+enum class ModelFormat {
+    /** MediaPipe LLM Inference API (.task files) */
+    MEDIAPIPE,
+    /** llama.cpp GGUF format (.gguf files) */
+    GGUF
+}
+
+/**
  * Information about a downloadable model.
  */
 data class ModelInfo(
@@ -327,9 +464,16 @@ data class ModelInfo(
     val minRamMB: Int,
     val description: String,
     val descriptionZh: String,
-    val supportsVision: Boolean = false
+    val supportsVision: Boolean = false,
+    val format: ModelFormat = ModelFormat.MEDIAPIPE
 ) {
     val sizeMB: Long get() = sizeBytes / (1024 * 1024)
+
+    /** Returns true if this is a GGUF model for llama.cpp */
+    val isGguf: Boolean get() = format == ModelFormat.GGUF
+
+    /** Returns true if this is a MediaPipe model */
+    val isMediaPipe: Boolean get() = format == ModelFormat.MEDIAPIPE
 }
 
 /**
