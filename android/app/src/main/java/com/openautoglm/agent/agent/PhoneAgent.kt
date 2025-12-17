@@ -285,16 +285,31 @@ class PhoneAgent(
             }
 
             // Parse action from response
-            val action = try {
-                currentTaskId?.let { taskId ->
-                    ResponseParser.parseAction(modelResponse, taskId)
-                } ?: throw IllegalStateException("No current task ID")
+            val taskId = currentTaskId
+            if (taskId == null) {
+                Log.e(TAG, "No current task ID, cannot continue")
+                return StepResult(
+                    success = false,
+                    finished = true,
+                    action = null,
+                    thinking = modelResponse.thinking,
+                    message = "Internal error: No task ID"
+                )
+            }
+
+            val action: Action = try {
+                ResponseParser.parseAction(modelResponse, taskId) ?: Action(
+                    taskId = taskId,
+                    type = ActionType.FINISH,
+                    parameters = mapOf("message" to modelResponse.action),
+                    thinking = modelResponse.thinking
+                )
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to parse action, treating as finish", e)
                 Action(
-                    taskId = currentTaskId ?: UUID.randomUUID(),
+                    taskId = taskId,
                     type = ActionType.FINISH,
-                    parameters = mapOf("message" to (modelResponse.action)),
+                    parameters = mapOf("message" to modelResponse.action),
                     thinking = modelResponse.thinking
                 )
             }

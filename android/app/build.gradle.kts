@@ -109,6 +109,15 @@ dependencies {
     // Security - Android Keystore for API keys
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
+    // On-device ML Inference using MediaPipe LLM Inference API
+    // Supports Gemma-3, Gemma-2, Phi-2 and other models with vision/multimodal support
+    implementation("com.google.mediapipe:tasks-genai:0.10.20")
+    // MediaPipe vision tasks for BitmapImageBuilder (image conversion)
+    implementation("com.google.mediapipe:tasks-vision:0.10.20")
+
+    // WorkManager for background model downloads
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")

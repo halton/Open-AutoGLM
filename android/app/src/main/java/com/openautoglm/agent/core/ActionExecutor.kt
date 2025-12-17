@@ -8,6 +8,7 @@ import com.openautoglm.agent.accessibility.AutoGLMAccessibilityService
 import com.openautoglm.agent.data.entities.Action
 import com.openautoglm.agent.data.entities.ActionResult
 import com.openautoglm.agent.data.entities.ActionType
+import com.openautoglm.agent.knowledge.DefaultAppMappings
 import kotlinx.coroutines.delay
 
 /**
@@ -426,7 +427,7 @@ class ActionExecutor(private val context: Context) {
 
     /**
      * Resolves an app name to its package name.
-     * Supports common app names and their package names.
+     * First checks DefaultAppMappings, then falls back to hardcoded mappings.
      */
     private fun resolveAppNameToPackage(appName: String): String {
         // If it looks like a package name (contains dots), use it directly
@@ -434,7 +435,12 @@ class ActionExecutor(private val context: Context) {
             return appName
         }
 
-        // Map common app names to package names
+        // First, try to resolve using DefaultAppMappings (centralized app registry)
+        DefaultAppMappings.getByNameOrAlias(appName)?.let {
+            return it.packageName
+        }
+
+        // Fall back to hardcoded mappings for backward compatibility
         val appNameLower = appName.lowercase()
         return when {
             // Travel & Train booking

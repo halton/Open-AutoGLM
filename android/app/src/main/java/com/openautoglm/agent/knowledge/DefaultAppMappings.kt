@@ -334,6 +334,16 @@ object DefaultAppMappings {
         // ============================================
         add(
             AppMapping.create(
+                packageName = "com.lucky.luckyclient",
+                appName = "Luckin Coffee",
+                category = AppCategory.FOOD,
+                zhPrompt = "瑞幸咖啡是中国领先的咖啡连锁品牌，支持在线点单、优惠券领取和外卖配送",
+                enPrompt = "Luckin Coffee is China's leading coffee chain with online ordering, coupons, and delivery",
+                aliases = listOf("瑞幸咖啡", "瑞幸", "Luckin", "luckin", "luckincoffee")
+            )
+        )
+        add(
+            AppMapping.create(
                 packageName = "com.sankuai.meituan",
                 appName = "Meituan",
                 category = AppCategory.FOOD,
