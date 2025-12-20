@@ -4,13 +4,16 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.openautoglm.agent.inference.DownloadMirror
 import com.openautoglm.agent.inference.DownloadState
 import com.openautoglm.agent.inference.ModelDownloadManager
 import com.openautoglm.agent.inference.ModelFormat
 import com.openautoglm.agent.inference.ModelInfo
+import com.openautoglm.agent.inference.NetworkTestResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
@@ -33,6 +36,9 @@ class ModelDownloadViewModel(application: Application) : AndroidViewModel(applic
     init {
         loadModels()
         observeDownloadStates()
+        observeMirrorState()
+        // Auto-test network on init
+        testNetworkConnectivity()
     }
 
     /**
@@ -59,12 +65,18 @@ class ModelDownloadViewModel(application: Application) : AndroidViewModel(applic
         viewModelScope.launch {
             downloadManager.downloadStates.collect { states ->
                 val downloadProgress = mutableMapOf<String, Float>()
+                val downloadProgressInfo = mutableMapOf<String, DownloadProgressInfo>()
                 val downloadErrors = mutableMapOf<String, String>()
 
                 states.forEach { (modelId, state) ->
                     when (state) {
                         is DownloadState.Downloading -> {
                             downloadProgress[modelId] = state.progress
+                            downloadProgressInfo[modelId] = DownloadProgressInfo(
+                                progress = state.progress,
+                                downloadedBytes = state.downloadedBytes,
+                                totalBytes = state.totalBytes
+                            )
                         }
                         is DownloadState.Failed -> {
                             downloadErrors[modelId] = state.error
@@ -83,6 +95,7 @@ class ModelDownloadViewModel(application: Application) : AndroidViewModel(applic
 
                 _uiState.value = _uiState.value.copy(
                     downloadProgress = downloadProgress,
+                    downloadProgressInfo = downloadProgressInfo,
                     downloadErrors = downloadErrors
                 )
             }
@@ -90,7 +103,67 @@ class ModelDownloadViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /**
+     * Observes mirror selection and network test states.
+     */
+    private fun observeMirrorState() {
+        viewModelScope.launch {
+            combine(
+                downloadManager.selectedMirror,
+                downloadManager.networkTestResults
+            ) { selectedMirror, testResults ->
+                Pair(selectedMirror, testResults)
+            }.collect { (selectedMirror, testResults) ->
+                _uiState.value = _uiState.value.copy(
+                    selectedMirror = selectedMirror,
+                    networkTestResults = testResults
+                )
+            }
+        }
+    }
+
+    /**
+     * Tests network connectivity to all mirrors.
+     */
+    fun testNetworkConnectivity() {
+        _uiState.value = _uiState.value.copy(isTestingNetwork = true)
+        viewModelScope.launch {
+            try {
+                downloadManager.testAllMirrors()
+            } finally {
+                _uiState.value = _uiState.value.copy(isTestingNetwork = false)
+            }
+        }
+    }
+
+    /**
+     * Sets the download mirror.
+     */
+    fun setMirror(mirror: DownloadMirror) {
+        downloadManager.setMirror(mirror)
+    }
+
+    /**
+     * Auto-selects the best available mirror based on connectivity.
+     */
+    fun autoSelectBestMirror() {
+        _uiState.value = _uiState.value.copy(isTestingNetwork = true)
+        viewModelScope.launch {
+            try {
+                downloadManager.autoSelectBestMirror()
+            } finally {
+                _uiState.value = _uiState.value.copy(isTestingNetwork = false)
+            }
+        }
+    }
+
+    /**
+     * Gets all available mirrors.
+     */
+    fun getAvailableMirrors(): List<DownloadMirror> = DownloadMirror.entries
+
+    /**
      * Starts downloading a model.
+     * Tests network connectivity first if not already tested.
      *
      * @param modelId The model identifier to download
      * @param requireWifi If true, only download on WiFi (default true)
@@ -100,9 +173,61 @@ class ModelDownloadViewModel(application: Application) : AndroidViewModel(applic
 
         viewModelScope.launch {
             try {
-                val started = downloadManager.startDownload(modelId, requireWifi)
-                if (!started) {
-                    Log.w(TAG, "Download not started for $modelId (already downloaded or downloading)")
+                // Test network first if not tested
+                val selectedMirror = _uiState.value.selectedMirror
+                val testResult = _uiState.value.networkTestResults[selectedMirror]
+
+                if (testResult == null || testResult is NetworkTestResult.NotTested) {
+                    // Need to test network first
+                    Log.i(TAG, "Testing network connectivity before download...")
+                    _uiState.value = _uiState.value.copy(isTestingNetwork = true)
+                    val result = downloadManager.testMirrorConnectivity(selectedMirror)
+
+                    if (result is NetworkTestResult.Failed) {
+                        Log.e(TAG, "Network test failed: ${result.error}")
+                        _uiState.value = _uiState.value.copy(
+                            isTestingNetwork = false,
+                            downloadErrors = _uiState.value.downloadErrors + (modelId to
+                                "Cannot connect to ${selectedMirror.displayName}. Please check your network or select a different mirror.\n" +
+                                "无法连接到 ${selectedMirror.displayNameZh}。请检查网络或选择其他镜像源。")
+                        )
+                        return@launch
+                    }
+                    _uiState.value = _uiState.value.copy(isTestingNetwork = false)
+                } else if (testResult is NetworkTestResult.Failed) {
+                    // Already tested and failed
+                    _uiState.value = _uiState.value.copy(
+                        downloadErrors = _uiState.value.downloadErrors + (modelId to
+                            "Cannot connect to ${selectedMirror.displayName}. Please check your network or select a different mirror.\n" +
+                            "无法连接到 ${selectedMirror.displayNameZh}。请检查网络或选择其他镜像源。")
+                    )
+                    return@launch
+                }
+
+                // Start the download
+                val result = downloadManager.startDownload(modelId, requireWifi, testNetworkFirst = false)
+                when (result) {
+                    is ModelDownloadManager.StartDownloadResult.Started -> {
+                        Log.i(TAG, "Download started for $modelId")
+                    }
+                    is ModelDownloadManager.StartDownloadResult.AlreadyDownloaded -> {
+                        Log.w(TAG, "Model $modelId already downloaded")
+                    }
+                    is ModelDownloadManager.StartDownloadResult.AlreadyDownloading -> {
+                        Log.w(TAG, "Model $modelId already downloading")
+                    }
+                    is ModelDownloadManager.StartDownloadResult.NetworkUnavailable -> {
+                        Log.e(TAG, "Network unavailable for mirror: ${result.mirror.displayName}")
+                    }
+                    is ModelDownloadManager.StartDownloadResult.Failed -> {
+                        Log.e(TAG, "Download failed: ${result.error}")
+                        _uiState.value = _uiState.value.copy(
+                            downloadErrors = _uiState.value.downloadErrors + (modelId to result.error)
+                        )
+                    }
+                    is ModelDownloadManager.StartDownloadResult.NeedNetworkTest -> {
+                        Log.w(TAG, "Need to test network first")
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start download: ${e.message}", e)
@@ -188,17 +313,31 @@ class ModelDownloadViewModel(application: Application) : AndroidViewModel(applic
 }
 
 /**
+ * Download progress info including bytes downloaded.
+ */
+data class DownloadProgressInfo(
+    val progress: Float,
+    val downloadedBytes: Long,
+    val totalBytes: Long
+)
+
+/**
  * UI state for the Model Download screen.
  */
 data class ModelDownloadUiState(
     val availableModels: List<ModelInfo> = emptyList(),
     val downloadedModels: Set<String> = emptySet(),
     val downloadProgress: Map<String, Float> = emptyMap(),
+    val downloadProgressInfo: Map<String, DownloadProgressInfo> = emptyMap(),
     val downloadErrors: Map<String, String> = emptyMap(),
     val recommendedModelId: String? = null,
     val totalModelSizeMB: Long = 0,
     val availableSpaceMB: Long = 0,
-    val selectedFilter: ModelFilter = ModelFilter.ALL
+    val selectedFilter: ModelFilter = ModelFilter.ALL,
+    // Mirror-related state
+    val selectedMirror: DownloadMirror = DownloadMirror.HUGGINGFACE,
+    val networkTestResults: Map<DownloadMirror, NetworkTestResult> = emptyMap(),
+    val isTestingNetwork: Boolean = false
 )
 
 /**

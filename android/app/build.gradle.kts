@@ -65,6 +65,12 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        // Extract native libraries to disk for 16KB page alignment compatibility
+        // Required for Android 15+ devices with 16KB page sizes (e.g., Pixel 9 Pro Fold)
+        // MediaPipe and llama.cpp prebuilt libraries are not 16KB aligned
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
