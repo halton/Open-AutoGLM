@@ -28,4 +28,10 @@
     <string name="error_accessibility_not_enabled">Please enable accessibility service to use AutoGLM</string>
     <string name="error_network_unavailable">Network unavailable. Switching to on-device mode.</string>
     <string name="error_cloud_inference_failed">Cloud inference failed. Retrying with local model.</string>
+
+    <!-- Model download errors -->
+    <string name="error_download_network_connection">Network connection error. Please ensure you can access huggingface.co (VPN may be required in some regions).</string>
+    <string name="error_download_network_connection_zh">网络连接错误。请确保可以访问 huggingface.co（部分地区可能需要 VPN）。</string>
+    <string name="error_download_timeout">Connection timed out. huggingface.co may be blocked in your region. Try using a VPN.</string>
+    <string name="error_download_failed">Download failed: %1$s</string>
 </resources>

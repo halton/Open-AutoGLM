@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,8 +20,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.openautoglm.agent.inference.DownloadMirror
 import com.openautoglm.agent.inference.ModelFormat
 import com.openautoglm.agent.inference.ModelInfo
+import com.openautoglm.agent.inference.NetworkTestResult
+import com.openautoglm.agent.ui.viewmodels.DownloadProgressInfo
 import com.openautoglm.agent.ui.viewmodels.ModelDownloadViewModel
 import com.openautoglm.agent.ui.viewmodels.ModelFilter
 
@@ -61,6 +67,18 @@ fun ModelDownloadScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Mirror Selection Card
+        MirrorSelectionCard(
+            selectedMirror = uiState.selectedMirror,
+            networkTestResults = uiState.networkTestResults,
+            isTestingNetwork = uiState.isTestingNetwork,
+            onMirrorSelected = { viewModel.setMirror(it) },
+            onTestNetwork = { viewModel.testNetworkConnectivity() },
+            onAutoSelect = { viewModel.autoSelectBestMirror() }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // Filter Chips
         FilterChips(
             selectedFilter = selectedFilter,
@@ -86,6 +104,7 @@ fun ModelDownloadScreen(
                     isDownloaded = uiState.downloadedModels.contains(model.id),
                     isRecommended = model.id == uiState.recommendedModelId,
                     downloadProgress = uiState.downloadProgress[model.id],
+                    progressInfo = uiState.downloadProgressInfo[model.id],
                     error = uiState.downloadErrors[model.id],
                     onDownloadClick = { viewModel.startDownload(model.id) },
                     onCancelClick = { viewModel.cancelDownload(model.id) },
@@ -182,6 +201,163 @@ private fun StorageInfoCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun MirrorSelectionCard(
+    selectedMirror: DownloadMirror,
+    networkTestResults: Map<DownloadMirror, NetworkTestResult>,
+    isTestingNetwork: Boolean,
+    onMirrorSelected: (DownloadMirror) -> Unit,
+    onTestNetwork: () -> Unit,
+    onAutoSelect: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Download Source / 下载源",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+
+                if (isTestingNetwork) {
+                    Text(
+                        text = "...",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    IconButton(
+                        onClick = onTestNetwork,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Test Network",
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Mirror options
+            DownloadMirror.entries.forEach { mirror ->
+                val testResult = networkTestResults[mirror]
+                val isSelected = selectedMirror == mirror
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.surface
+                    ),
+                    onClick = { onMirrorSelected(mirror) }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = mirror.displayName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                            Text(
+                                text = mirror.displayNameZh,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        // Status indicator
+                        when (testResult) {
+                            is NetworkTestResult.Testing -> {
+                                Text(
+                                    text = "Testing...",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            is NetworkTestResult.Success -> {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Connected",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "${testResult.latencyMs}ms",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            is NetworkTestResult.Failed -> {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Failed",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Failed",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                            else -> {
+                                Text(
+                                    text = "Not tested",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Auto-select button
+            OutlinedButton(
+                onClick = onAutoSelect,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isTestingNetwork
+            ) {
+                Text("Auto-select Best / 自动选择最佳")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun FilterChips(
     selectedFilter: ModelFilter,
     onFilterSelected: (ModelFilter) -> Unit
@@ -218,6 +394,7 @@ private fun ModelCard(
     isDownloaded: Boolean,
     isRecommended: Boolean,
     downloadProgress: Float?,
+    progressInfo: DownloadProgressInfo?,
     error: String?,
     onDownloadClick: () -> Unit,
     onCancelClick: () -> Unit,
@@ -333,7 +510,7 @@ private fun ModelCard(
                 }
             }
 
-            // Error message
+            // Error message with network hint
             AnimatedVisibility(
                 visible = error != null,
                 enter = expandVertically(),
@@ -348,25 +525,51 @@ private fun ModelCard(
                             containerColor = MaterialTheme.colorScheme.errorContainer
                         )
                     ) {
-                        Row(
-                            modifier = Modifier.padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier.padding(12.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = it,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.weight(1f)
-                            )
-                            TextButton(onClick = onDismissError) {
-                                Text("Dismiss", style = MaterialTheme.typography.labelSmall)
+                            Row(
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Download Failed",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(onClick = onDismissError) {
+                                    Text("Dismiss")
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(
+                                    onClick = onDownloadClick,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary
+                                    )
+                                ) {
+                                    Text("Retry")
+                                }
                             }
                         }
                     }
@@ -387,13 +590,24 @@ private fun ModelCard(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "Downloading...",
-                                style = MaterialTheme.typography.labelSmall
-                            )
+                            // Show size progress if available
+                            if (progressInfo != null && progressInfo.totalBytes > 0) {
+                                Text(
+                                    text = "${formatBytes(progressInfo.downloadedBytes)} / ${formatBytes(progressInfo.totalBytes)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            } else {
+                                Text(
+                                    text = "Downloading...",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
                             Text(
                                 text = "${(progress * 100).toInt()}%",
-                                style = MaterialTheme.typography.labelSmall
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                         Spacer(modifier = Modifier.height(4.dp))
@@ -451,5 +665,17 @@ private fun formatSize(sizeMB: Long): String {
     return when {
         sizeMB >= 1024 -> String.format("%.1f GB", sizeMB / 1024.0)
         else -> "$sizeMB MB"
+    }
+}
+
+/**
+ * Formats bytes to human-readable string (e.g., "1.5 GB", "256 MB").
+ */
+private fun formatBytes(bytes: Long): String {
+    return when {
+        bytes >= 1_000_000_000L -> String.format("%.2f GB", bytes / 1_000_000_000.0)
+        bytes >= 1_000_000L -> String.format("%.1f MB", bytes / 1_000_000.0)
+        bytes >= 1_000L -> String.format("%.1f KB", bytes / 1_000.0)
+        else -> "$bytes B"
     }
 }
