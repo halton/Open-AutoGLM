@@ -86,6 +86,7 @@ class ModelDownloadManager(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val prefs = context.getSharedPreferences("model_download_prefs", Context.MODE_PRIVATE)
+    private val secureStorage = SecureKeyStorage(context)
 
     // Current mirror selection
     private val _selectedMirror = MutableStateFlow(
@@ -159,7 +160,7 @@ class ModelDownloadManager(
                 displayName = "Gemma 3 1B (INT4)",
                 fileName = "gemma3-1b-it-int4.task",
                 downloadUrl = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.task",
-                sizeBytes = 700_000_000L, // ~700MB
+                sizeBytes = 555_000_000L, // ~555MB (actual: 554.7MB)
                 minRamMB = 2048,
                 description = "Fallback - Compact model for low-end devices",
                 descriptionZh = "备选 - 适用于低端设备的紧凑模型",
@@ -172,7 +173,7 @@ class ModelDownloadManager(
                 displayName = "Gemma 3 1B (INT8)",
                 fileName = "Gemma3-1B-IT_multi-prefill-seq_q8_ekv1280.task",
                 downloadUrl = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/Gemma3-1B-IT_multi-prefill-seq_q8_ekv1280.task",
-                sizeBytes = 1_200_000_000L, // ~1.2GB
+                sizeBytes = 1_050_000_000L, // ~1.05GB (actual: 1.05GB)
                 minRamMB = 3072,
                 description = "Fallback - Higher quality Gemma for mid-range devices",
                 descriptionZh = "备选 - 适用于中端设备的高质量Gemma",
@@ -185,7 +186,7 @@ class ModelDownloadManager(
                 displayName = "Gemma 3 1B (INT4, 4K context)",
                 fileName = "Gemma3-1B-IT_multi-prefill-seq_q4_block128_ekv4096.task",
                 downloadUrl = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/Gemma3-1B-IT_multi-prefill-seq_q4_block128_ekv4096.task",
-                sizeBytes = 800_000_000L, // ~800MB
+                sizeBytes = 690_000_000L, // ~690MB (actual: 689.3MB)
                 minRamMB = 3072,
                 description = "Fallback - INT4 with extended 4096 token context",
                 descriptionZh = "备选 - INT4量化，支持4096 token上下文",
@@ -373,10 +374,15 @@ class ModelDownloadManager(
         Log.i(TAG, "Starting download for model: $modelId from ${_selectedMirror.value.displayName}")
         Log.i(TAG, "Download URL: $downloadUrl")
 
+        // Use CONNECTED to allow both WiFi and cellular downloads
+        // Users on cellular should be aware of large file sizes from the UI
         val constraints = Constraints.Builder()
-            .setRequiredNetworkType(if (requireWifi) NetworkType.UNMETERED else NetworkType.CONNECTED)
+            .setRequiredNetworkType(NetworkType.CONNECTED)
             .setRequiresStorageNotLow(true)
             .build()
+
+        // Get HuggingFace token for gated models (like Gemma)
+        val hfToken = secureStorage.getHuggingFaceToken()
 
         val inputData = Data.Builder()
             .putString("model_id", modelId)
@@ -384,6 +390,8 @@ class ModelDownloadManager(
             .putString("file_name", modelInfo.fileName)
             .putLong("file_size", modelInfo.sizeBytes)
             .putString("mirror_name", _selectedMirror.value.displayName)
+            .putString("hf_token", hfToken ?: "")
+            .putBoolean("is_gated_model", modelInfo.format == ModelFormat.MEDIAPIPE) // Gemma models are gated
             .build()
 
         val downloadRequest = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
@@ -794,8 +802,10 @@ class ModelDownloadWorker(
         val downloadUrl = inputData.getString("download_url") ?: return@withContext Result.failure()
         val fileName = inputData.getString("file_name") ?: return@withContext Result.failure()
         val fileSize = inputData.getLong("file_size", 0L)
+        val hfToken = inputData.getString("hf_token")?.takeIf { it.isNotBlank() }
+        val isGatedModel = inputData.getBoolean("is_gated_model", false)
 
-        Log.i(TAG, "Starting download: $modelId from $downloadUrl")
+        Log.i(TAG, "Starting download: $modelId from $downloadUrl (gated: $isGatedModel, hasToken: ${hfToken != null})")
 
         val modelsDir = File(applicationContext.filesDir, MODELS_DIR)
         modelsDir.mkdirs()
@@ -813,12 +823,40 @@ class ModelDownloadWorker(
                 Log.i(TAG, "Resuming download from byte $startByte")
             }
 
+            // Add HuggingFace authorization header for gated models
+            if (hfToken != null) {
+                requestBuilder.addHeader("Authorization", "Bearer $hfToken")
+                Log.i(TAG, "Using HuggingFace token for authentication")
+            }
+
             val response = httpClient.newCall(requestBuilder.build()).execute()
 
             if (!response.isSuccessful) {
                 Log.e(TAG, "Download failed: ${response.code}")
                 val errorMessage = when (response.code) {
-                    401 -> "Model access unauthorized (401). The model may require authentication or the URL is invalid.\n模型访问未授权 (401)。模型可能需要认证或URL无效。"
+                    401 -> if (isGatedModel && hfToken == null) {
+                        "This model requires HuggingFace authentication.\n\n" +
+                        "To download Gemma models:\n" +
+                        "1. Create account at huggingface.co\n" +
+                        "2. Accept license at huggingface.co/litert-community/Gemma3-1B-IT\n" +
+                        "3. Generate token at huggingface.co/settings/tokens (select 'Read' scope)\n" +
+                        "4. Enter token in Settings > HuggingFace Token\n\n" +
+                        "此模型需要 HuggingFace 认证。\n" +
+                        "1. 在 huggingface.co 创建账号\n" +
+                        "2. 访问 huggingface.co/litert-community/Gemma3-1B-IT 接受许可证\n" +
+                        "3. 在 huggingface.co/settings/tokens 生成令牌（选择 'Read' 权限）\n" +
+                        "4. 在设置中输入访问令牌"
+                    } else if (isGatedModel) {
+                        "Authentication failed. Please check:\n" +
+                        "1. Your HuggingFace token is valid (with 'Read' scope)\n" +
+                        "2. You've accepted the license at huggingface.co/litert-community/Gemma3-1B-IT\n\n" +
+                        "认证失败。请检查：\n" +
+                        "1. 您的 HuggingFace 令牌有效（具有 'Read' 权限）\n" +
+                        "2. 已在 huggingface.co/litert-community/Gemma3-1B-IT 接受许可证"
+                    } else {
+                        "Model access unauthorized (401). The model may require authentication or the URL is invalid.\n" +
+                        "模型访问未授权 (401)。模型可能需要认证或URL无效。"
+                    }
                     403 -> "Model access forbidden (403). You may need to accept the model's terms on Hugging Face.\n模型访问被禁止 (403)。您可能需要在 Hugging Face 上接受模型条款。"
                     404 -> "Model not found (404). The model file may have been moved or deleted.\n未找到模型 (404)。模型文件可能已被移动或删除。"
                     else -> "Download failed with HTTP error ${response.code}.\n下载失败，HTTP 错误 ${response.code}。"

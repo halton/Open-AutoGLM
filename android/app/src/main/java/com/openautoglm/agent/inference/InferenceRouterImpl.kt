@@ -14,6 +14,7 @@ import com.openautoglm.agent.model.ChatMessage
 import com.openautoglm.agent.model.ChatRole
 import com.openautoglm.agent.model.CloudModelClient
 import com.openautoglm.agent.model.InferenceException
+import com.openautoglm.agent.model.ModelClient
 import com.openautoglm.agent.model.ModelResponse
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -35,7 +36,7 @@ import kotlinx.coroutines.sync.withLock
 class InferenceRouterImpl(
     private val context: Context,
     private val repository: AgentRepository
-) {
+) : ModelClient {
     companion object {
         private const val TAG = "InferenceRouterImpl"
 
@@ -91,8 +92,21 @@ class InferenceRouterImpl(
     // Model download manager for checking available models
     private val modelDownloadManager = ModelDownloadManager(context)
 
+    // Secure storage for reading user's configured inference mode
+    private val secureStorage = SecureKeyStorage(context)
+
     // Client cache
     private val clientMutex = Mutex()
+
+    /**
+     * Implements ModelClient interface.
+     * Routes based on user's configured inference mode from Settings.
+     */
+    override suspend fun request(messages: List<ChatMessage>): ModelResponse {
+        val configuredMode = secureStorage.getInferenceMode()
+        Log.i(TAG, "ModelClient.request() called, using configured mode: $configuredMode")
+        return route(messages, configuredMode)
+    }
 
     /**
      * Routes an inference request to the appropriate backend.
@@ -195,6 +209,7 @@ class InferenceRouterImpl(
         val onDeviceClient = getOnDeviceClient()
         if (onDeviceClient != null) {
             try {
+                Log.i(TAG, "Attempting on-device inference...")
                 return onDeviceClient.request(messages)
             } catch (e: Exception) {
                 Log.w(TAG, "On-device inference failed: ${e.message}")
@@ -202,15 +217,34 @@ class InferenceRouterImpl(
                     throw e
                 }
             }
+        } else {
+            Log.w(TAG, "No on-device client available")
         }
 
         if (!allowCloudFallback) {
-            throw InferenceException("On-device inference not available and cloud fallback disabled")
+            val ggufPath = modelDownloadManager.getGgufModelPath()
+            val errorMsg = if (ggufPath != null && !LlamaCppInference.isNativeLibraryAvailable()) {
+                "GGUF model downloaded but llama.cpp native library not available. " +
+                "Please download a Gemma model (.task format) from Settings > Download Model for offline use."
+            } else {
+                "No on-device model available. Please download a model from Settings > Download Model."
+            }
+            throw InferenceException(errorMsg)
         }
 
         // Fallback to cloud
+        Log.i(TAG, "Falling back to cloud inference...")
         val cloudClient = getCloudClient()
-            ?: throw InferenceException("No inference backend available")
+        if (cloudClient == null) {
+            val ggufPath = modelDownloadManager.getGgufModelPath()
+            val errorMsg = if (ggufPath != null && !LlamaCppInference.isNativeLibraryAvailable()) {
+                "No inference available. GGUF model found but requires llama.cpp native library. " +
+                "Cloud is also unavailable. Please download a Gemma model (.task) for offline use."
+            } else {
+                "No inference backend available. Please check network connection or download a model."
+            }
+            throw InferenceException(errorMsg)
+        }
         return cloudClient.request(messages)
     }
 
@@ -224,31 +258,49 @@ class InferenceRouterImpl(
      */
     private suspend fun getOnDeviceClient(): com.openautoglm.agent.model.ModelClient? {
         return clientMutex.withLock {
+            Log.i(TAG, "=== Checking for on-device models ===")
+
             // First try llama.cpp (GGUF models like AutoGLM-Phone)
             val ggufPath = modelDownloadManager.getGgufModelPath()
+            Log.i(TAG, "GGUF model path: ${ggufPath ?: "not found"}")
+
             if (ggufPath != null) {
                 if (llamaCppInference == null) {
                     llamaCppInference = LlamaCppInference(context)
                 }
-                if (llamaCppInference?.isAvailable() == true) {
+                val isLlamaAvailable = llamaCppInference?.isAvailable() == true
+                Log.i(TAG, "llama.cpp native library available: ${LlamaCppInference.isNativeLibraryAvailable()}")
+                Log.i(TAG, "llama.cpp inference available: $isLlamaAvailable")
+
+                if (isLlamaAvailable) {
                     Log.i(TAG, "Using llama.cpp with GGUF model: $ggufPath")
                     return@withLock llamaCppInference
+                } else if (!LlamaCppInference.isNativeLibraryAvailable()) {
+                    Log.w(TAG, "GGUF model found but llama.cpp native library (libllama.so) not available!")
+                    Log.w(TAG, "Please download a MediaPipe (.task) model instead, or build llama.cpp for Android")
                 }
             }
 
             // Fallback to MediaPipe (Gemma .task models)
             val mediaPipePath = modelDownloadManager.getMediaPipeModelPath()
+            Log.i(TAG, "MediaPipe model path: ${mediaPipePath ?: "not found"}")
+
             if (mediaPipePath != null) {
                 if (mediaPipeInference == null) {
                     mediaPipeInference = OnDeviceInference(context)
                 }
-                if (mediaPipeInference?.isAvailable() == true) {
+                val isMediaPipeAvailable = mediaPipeInference?.isAvailable() == true
+                Log.i(TAG, "MediaPipe inference available: $isMediaPipeAvailable")
+
+                if (isMediaPipeAvailable) {
                     Log.i(TAG, "Using MediaPipe with model: $mediaPipePath")
                     return@withLock mediaPipeInference
                 }
             }
 
-            Log.w(TAG, "No on-device model available")
+            Log.w(TAG, "=== No on-device model available ===")
+            Log.w(TAG, "Downloaded models: ${modelDownloadManager.getDownloadedModels().map { it.id }}")
+            Log.w(TAG, "To use offline: Download a Gemma model (MediaPipe .task format)")
             null
         }
     }

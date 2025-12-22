@@ -1,0 +1,291 @@
+# Voice Input Internal API Contract
+# This defines the internal interfaces for voice input functionality.
+# Not a public API - used for component contracts within the app.
+# Added: 2025-12-20
+
+openapi: 3.0.3
+info:
+  title: AutoGLM Voice Input Service
+  description: Internal service contracts for voice input in the Android agent
+  version: 1.0.0
+
+# Note: This is not a REST API. These contracts define the interface
+# between Kotlin components, documented in OpenAPI format for clarity.
+
+components:
+  schemas:
+    # Voice Input State Machine
+    VoiceInputState:
+      oneOf:
+        - $ref: '#/components/schemas/VoiceInputStateIdle'
+        - $ref: '#/components/schemas/VoiceInputStateListening'
+        - $ref: '#/components/schemas/VoiceInputStateProcessing'
+        - $ref: '#/components/schemas/VoiceInputStateResult'
+        - $ref: '#/components/schemas/VoiceInputStateError'
+      discriminator:
+        propertyName: type
+        mapping:
+          idle: '#/components/schemas/VoiceInputStateIdle'
+          listening: '#/components/schemas/VoiceInputStateListening'
+          processing: '#/components/schemas/VoiceInputStateProcessing'
+          result: '#/components/schemas/VoiceInputStateResult'
+          error: '#/components/schemas/VoiceInputStateError'
+
+    VoiceInputStateIdle:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [idle]
+
+    VoiceInputStateListening:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [listening]
+        partialText:
+          type: string
+          description: Current partial transcription (may be empty)
+          default: ""
+        soundLevel:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Audio input level for visualization
+          default: 0.0
+
+    VoiceInputStateProcessing:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [processing]
+
+    VoiceInputStateResult:
+      type: object
+      required:
+        - type
+        - transcription
+      properties:
+        type:
+          type: string
+          enum: [result]
+        transcription:
+          type: string
+          description: Final transcribed text
+        confidence:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          nullable: true
+          description: Recognition confidence if available
+
+    VoiceInputStateError:
+      type: object
+      required:
+        - type
+        - message
+        - errorCode
+      properties:
+        type:
+          type: string
+          enum: [error]
+        message:
+          type: string
+          description: User-facing error message (localized)
+        errorCode:
+          type: integer
+          description: Android SpeechRecognizer error code
+        isRetryable:
+          type: boolean
+          default: true
+          description: Whether user can retry recognition
+
+    # Configuration
+    VoiceInputConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: true
+          description: Whether voice input is enabled
+        locale:
+          type: string
+          description: BCP-47 language tag for recognition (e.g., "zh-CN", "en-US")
+          default: "en-US"
+        showPartialResults:
+          type: boolean
+          default: true
+          description: Show real-time partial transcription
+        maxDurationMs:
+          type: integer
+          format: int64
+          default: 60000
+          description: Maximum recognition duration in milliseconds
+        silenceTimeoutMs:
+          type: integer
+          format: int64
+          default: 1500
+          description: Silence duration before recognition stops
+        preferOffline:
+          type: boolean
+          default: false
+          description: Prefer on-device recognition for privacy
+
+    # Permission State
+    AudioPermissionState:
+      type: string
+      enum:
+        - GRANTED
+        - NOT_REQUESTED
+        - DENIED_SHOW_RATIONALE
+        - PERMANENTLY_DENIED
+        - UNKNOWN
+      description: State of RECORD_AUDIO permission
+
+    # Error Codes
+    VoiceErrorCode:
+      type: object
+      required:
+        - code
+        - name
+        - isRetryable
+        - messageEn
+        - messageZh
+      properties:
+        code:
+          type: integer
+          description: Android SpeechRecognizer error code
+        name:
+          type: string
+          description: Error constant name
+        isRetryable:
+          type: boolean
+          description: Whether error allows retry
+        messageEn:
+          type: string
+          description: English error message
+        messageZh:
+          type: string
+          description: Chinese error message
+
+# Interface Definitions (Kotlin contracts)
+paths:
+  # These are not HTTP endpoints - they represent Kotlin interface methods
+
+  /voice/manager:
+    description: |
+      VoiceInputManager Interface
+
+      ```kotlin
+      interface VoiceInputManager {
+          val state: StateFlow<VoiceInputState>
+          val isAvailable: Boolean
+          fun startListening(locale: Locale)
+          fun stopListening()
+          fun cancelListening()
+          fun destroy()
+      }
+      ```
+
+  /voice/manager/state:
+    get:
+      summary: Observe voice input state
+      description: |
+        Kotlin: `val state: StateFlow<VoiceInputState>`
+
+        Returns a StateFlow that emits the current VoiceInputState.
+        UI observes this to update voice input feedback.
+      responses:
+        '200':
+          description: Current voice input state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoiceInputState'
+
+  /voice/manager/available:
+    get:
+      summary: Check if voice input is available
+      description: |
+        Kotlin: `val isAvailable: Boolean`
+
+        Returns true if SpeechRecognizer is available on this device.
+        If false, hide or disable the microphone button.
+      responses:
+        '200':
+          description: Availability status
+          content:
+            application/json:
+              schema:
+                type: boolean
+
+  /voice/manager/start:
+    post:
+      summary: Start voice recognition
+      description: |
+        Kotlin: `fun startListening(locale: Locale)`
+
+        Begins speech recognition with the specified locale.
+        State transitions: Idle → Listening
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                locale:
+                  type: string
+                  description: BCP-47 locale tag
+      responses:
+        '200':
+          description: Recognition started
+
+  /voice/manager/stop:
+    post:
+      summary: Stop voice recognition
+      description: |
+        Kotlin: `fun stopListening()`
+
+        Stops listening and triggers final recognition.
+        State transitions: Listening → Processing → Result/Error
+      responses:
+        '200':
+          description: Recognition stopped
+
+  /voice/manager/cancel:
+    post:
+      summary: Cancel voice recognition
+      description: |
+        Kotlin: `fun cancelListening()`
+
+        Cancels recognition without processing.
+        State transitions: Listening/Processing → Idle
+      responses:
+        '200':
+          description: Recognition cancelled
+
+  /voice/viewmodel:
+    description: |
+      TaskViewModel Voice Extensions
+
+      ```kotlin
+      // Added to TaskViewModel
+      val voiceInputState: StateFlow<VoiceInputState>
+      val audioPermissionState: StateFlow<AudioPermissionState>
+
+      fun startVoiceInput()
+      fun stopVoiceInput()
+      fun cancelVoiceInput()
+      fun acceptTranscription(text: String)
+      fun checkAudioPermission()
+      ```

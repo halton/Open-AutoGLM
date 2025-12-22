@@ -9,7 +9,7 @@ import com.openautoglm.agent.agent.PhoneAgent
 import com.openautoglm.agent.accessibility.ScreenCaptureManager
 import com.openautoglm.agent.data.AgentRepository
 import com.openautoglm.agent.data.AppDatabase
-import com.openautoglm.agent.inference.CloudInference
+import com.openautoglm.agent.inference.InferenceRouterImpl
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,7 +30,9 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         userPreferencesDao = database.userPreferencesDao(),
         modelConfigDao = database.modelConfigDao()
     )
-    private val modelClient = CloudInference(application)
+    // Use InferenceRouterImpl for smart routing between on-device and cloud
+    // with automatic fallback when network is unavailable
+    private val modelClient = InferenceRouterImpl(application, repository)
     private val screenCapture = ScreenCaptureManager.getInstance(application)
     private val config = AgentConfig.DEFAULT
 

@@ -9,6 +9,7 @@ plugins {
 android {
     namespace = "com.openautoglm.agent"
     compileSdk = 34
+    ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "com.openautoglm.agent"
@@ -26,6 +27,32 @@ android {
         // Room schema export for migrations
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
+        }
+
+        // Native build configuration for llama.cpp
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
+
+        externalNativeBuild {
+            cmake {
+                cppFlags += listOf("-std=c++17", "-fexceptions", "-frtti")
+                arguments += listOf(
+                    "-DANDROID_STL=c++_shared",
+                    "-DBUILD_SHARED_LIBS=ON",
+                    "-DOS_NAME=Android",
+                    "-DOS_ARCH=aarch64",
+                    "-DGGML_OPENMP=OFF",
+                    "-DGGML_LLAMAFILE=OFF"
+                )
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("../java-llama-cpp/CMakeLists.txt")
+            version = "3.22.1"
         }
     }
 
@@ -50,6 +77,13 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+    // Include java-llama.cpp Java sources
+    sourceSets {
+        getByName("main") {
+            java.srcDirs("../java-llama-cpp/src/main/java")
+        }
     }
 
     buildFeatures {
