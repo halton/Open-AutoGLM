@@ -334,6 +334,16 @@ object DefaultAppMappings {
         // ============================================
         add(
             AppMapping.create(
+                packageName = "com.lucky.luckyclient",
+                appName = "Luckin Coffee",
+                category = AppCategory.FOOD,
+                zhPrompt = "瑞幸咖啡是中国领先的咖啡连锁品牌，支持在线点单、优惠券领取和外卖配送",
+                enPrompt = "Luckin Coffee is China's leading coffee chain with online ordering, coupons, and delivery",
+                aliases = listOf("瑞幸咖啡", "瑞幸", "Luckin", "luckin", "luckincoffee")
+            )
+        )
+        add(
+            AppMapping.create(
                 packageName = "com.sankuai.meituan",
                 appName = "Meituan",
                 category = AppCategory.FOOD,
@@ -685,9 +695,19 @@ object DefaultAppMappings {
                 packageName = "com.google.android.calendar",
                 appName = "Google Calendar",
                 category = AppCategory.PRODUCTIVITY,
-                zhPrompt = "Google Calendar是谷歌的日历应用",
-                enPrompt = "Google Calendar is Google's calendar app",
-                aliases = listOf("GoogleCalendar", "Google-Calendar", "google-calendar", "google calendar")
+                zhPrompt = "Google Calendar是谷歌的日历应用，支持事件创建、提醒和日程管理",
+                enPrompt = "Google Calendar is Google's calendar app with event creation, reminders, and schedule management",
+                aliases = listOf("GoogleCalendar", "Google-Calendar", "google-calendar", "google calendar", "谷歌日历")
+            )
+        )
+        add(
+            AppMapping.create(
+                packageName = "com.android.calendar",
+                appName = "Calendar",
+                category = AppCategory.PRODUCTIVITY,
+                zhPrompt = "系统日历应用，用于管理日程、事件和提醒",
+                enPrompt = "System Calendar app for managing schedules, events, and reminders",
+                aliases = listOf("calendar", "日历", "系统日历", "Android Calendar")
             )
         )
         add(

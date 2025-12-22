@@ -22,7 +22,8 @@ import com.openautoglm.agent.ui.viewmodels.SettingsViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    viewModel: SettingsViewModel = viewModel()
+    viewModel: SettingsViewModel = viewModel(),
+    onNavigateToModelDownload: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
@@ -121,6 +122,38 @@ fun SettingsScreen(
                     },
                     modifier = Modifier.padding(start = 8.dp)
                 )
+            }
+        }
+
+        Divider()
+
+        // On-Device Models Section
+        Text(
+            text = "On-Device Models",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    text = "Run AI models locally on your device for offline use and enhanced privacy.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onNavigateToModelDownload,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Manage On-Device Models")
+                }
             }
         }
 

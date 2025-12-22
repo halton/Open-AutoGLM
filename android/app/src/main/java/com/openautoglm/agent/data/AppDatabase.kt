@@ -8,11 +8,14 @@ import androidx.room.TypeConverters
 import com.openautoglm.agent.data.dao.ActionDao
 import com.openautoglm.agent.data.dao.AppMappingDao
 import com.openautoglm.agent.data.dao.ModelConfigDao
+import com.openautoglm.agent.data.dao.ShipmentDao
 import com.openautoglm.agent.data.dao.TaskDao
 import com.openautoglm.agent.data.dao.UserPreferencesDao
 import com.openautoglm.agent.data.entities.Action
 import com.openautoglm.agent.data.entities.AppMapping
 import com.openautoglm.agent.data.entities.ModelConfig
+import com.openautoglm.agent.data.entities.Shipment
+import com.openautoglm.agent.data.entities.ShipmentConverters
 import com.openautoglm.agent.data.entities.Task
 import com.openautoglm.agent.data.entities.UserPreferences
 
@@ -25,6 +28,7 @@ import com.openautoglm.agent.data.entities.UserPreferences
  * - AppMappings: App package to metadata mappings
  * - UserPreferences: User configuration and settings
  * - ModelConfigs: VLM model configurations
+ * - Shipments: Package tracking across shopping apps
  */
 @Database(
     entities = [
@@ -32,12 +36,13 @@ import com.openautoglm.agent.data.entities.UserPreferences
         Action::class,
         AppMapping::class,
         UserPreferences::class,
-        ModelConfig::class
+        ModelConfig::class,
+        Shipment::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
-@TypeConverters(Converters::class)
+@TypeConverters(Converters::class, ShipmentConverters::class)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun taskDao(): TaskDao
@@ -45,6 +50,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun appMappingDao(): AppMappingDao
     abstract fun userPreferencesDao(): UserPreferencesDao
     abstract fun modelConfigDao(): ModelConfigDao
+    abstract fun shipmentDao(): ShipmentDao
 
     companion object {
         private const val DATABASE_NAME = "openautoglm_database"

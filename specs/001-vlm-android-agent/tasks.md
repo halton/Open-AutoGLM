@@ -219,25 +219,25 @@
 
 ### On-Device Inference Implementation
 
-- [ ] T084 [US4] Integrate MLC-LLM Android library for GPU inference in android/app/build.gradle.kts
-- [ ] T085 [US4] Implement OnDeviceInference using MLC-LLM in android/app/src/main/java/com/openautoglm/agent/inference/OnDeviceInference.kt
-- [ ] T086 [US4] Integrate llama.cpp Android bindings for CPU fallback in android/app/src/main/java/com/openautoglm/agent/inference/LlamaCppInference.kt
-- [ ] T087 [US4] Implement model download manager for first-run model download in android/app/src/main/java/com/openautoglm/agent/inference/ModelDownloadManager.kt
+- [x] T084 [US4] Integrate MLC-LLM Android library for GPU inference in android/app/build.gradle.kts
+- [x] T085 [US4] Implement OnDeviceInference using MLC-LLM in android/app/src/main/java/com/openautoglm/agent/inference/OnDeviceInference.kt
+- [x] T086 [US4] Integrate llama.cpp Android bindings for CPU fallback in android/app/src/main/java/com/openautoglm/agent/inference/LlamaCppInference.kt
+- [x] T087 [US4] Implement model download manager for first-run model download in android/app/src/main/java/com/openautoglm/agent/inference/ModelDownloadManager.kt
 
 ### InferenceRouter Complete Implementation
 
-- [ ] T088 [US4] Implement full InferenceRouter with on-device/cloud routing logic (per research.md) in android/app/src/main/java/com/openautoglm/agent/inference/InferenceRouterImpl.kt
+- [x] T088 [US4] Implement full InferenceRouter with on-device/cloud routing logic (per research.md) in android/app/src/main/java/com/openautoglm/agent/inference/InferenceRouterImpl.kt
 
 ### Text Extraction
 
-- [ ] T089 [US4] Implement text extraction task type detection in android/app/src/main/java/com/openautoglm/agent/agent/TaskTypeDetector.kt
-- [ ] T090 [US4] Implement text extraction result formatting (copyable) in android/app/src/main/java/com/openautoglm/agent/agent/TextExtractor.kt
-- [ ] T091 [US4] Implement translation request handling (route to cloud for translation) in android/app/src/main/java/com/openautoglm/agent/agent/TranslationHandler.kt
+- [x] T089 [US4] Implement text extraction task type detection in android/app/src/main/java/com/openautoglm/agent/agent/TaskTypeDetector.kt
+- [x] T090 [US4] Implement text extraction result formatting (copyable) in android/app/src/main/java/com/openautoglm/agent/agent/TextExtractor.kt
+- [x] T091 [US4] Implement translation request handling (route to cloud for translation) in android/app/src/main/java/com/openautoglm/agent/agent/TranslationHandler.kt
 
 ### Text Extraction UI
 
-- [ ] T092 [US4] Create TextExtractionResultScreen with copy functionality in android/app/src/main/java/com/openautoglm/agent/ui/screens/TextExtractionResultScreen.kt
-- [ ] T093 [P] [US4] Create HandwritingConfidenceIndicator component in android/app/src/main/java/com/openautoglm/agent/ui/components/HandwritingConfidenceIndicator.kt
+- [x] T092 [US4] Create TextExtractionResultScreen with copy functionality in android/app/src/main/java/com/openautoglm/agent/ui/screens/TextExtractionResultScreen.kt
+- [x] T093 [P] [US4] Create HandwritingConfidenceIndicator component in android/app/src/main/java/com/openautoglm/agent/ui/components/HandwritingConfidenceIndicator.kt
 
 **Checkpoint**: User Story 4 complete - text extraction functional with on-device inference
 
@@ -251,23 +251,23 @@
 
 ### Logistics Data Model
 
-- [ ] T094 [P] [US5] Create Shipment data class in android/app/src/main/java/com/openautoglm/agent/data/entities/Shipment.kt
-- [ ] T095 [P] [US5] Create ShipmentDao in android/app/src/main/java/com/openautoglm/agent/data/dao/ShipmentDao.kt
+- [x] T094 [P] [US5] Create Shipment data class in android/app/src/main/java/com/openautoglm/agent/data/entities/Shipment.kt
+- [x] T095 [P] [US5] Create ShipmentDao in android/app/src/main/java/com/openautoglm/agent/data/dao/ShipmentDao.kt
 
 ### Logistics Tracking Logic
 
-- [ ] T096 [US5] Implement multi-app logistics querying orchestration in android/app/src/main/java/com/openautoglm/agent/agent/LogisticsTracker.kt
-- [ ] T097 [US5] Implement shipment data extraction from app screens in android/app/src/main/java/com/openautoglm/agent/agent/ShipmentExtractor.kt
-- [ ] T098 [US5] Implement shipment status change detection in android/app/src/main/java/com/openautoglm/agent/agent/ShipmentStatusMonitor.kt
+- [x] T096 [US5] Implement multi-app logistics querying orchestration in android/app/src/main/java/com/openautoglm/agent/agent/LogisticsTracker.kt
+- [x] T097 [US5] Implement shipment data extraction from app screens in android/app/src/main/java/com/openautoglm/agent/agent/ShipmentExtractor.kt
+- [x] T098 [US5] Implement shipment status change detection in android/app/src/main/java/com/openautoglm/agent/agent/ShipmentStatusMonitor.kt
 
 ### Re-authentication Handling
 
-- [ ] T099 [US5] Implement app re-authentication detection and user prompting in android/app/src/main/java/com/openautoglm/agent/agent/AuthenticationHandler.kt
+- [x] T099 [US5] Implement app re-authentication detection and user prompting in android/app/src/main/java/com/openautoglm/agent/agent/AuthenticationHandler.kt
 
 ### Logistics UI
 
-- [ ] T100 [US5] Create ShipmentListScreen with consolidated deliveries view in android/app/src/main/java/com/openautoglm/agent/ui/screens/ShipmentListScreen.kt
-- [ ] T101 [P] [US5] Create ShipmentCard component with status and ETA in android/app/src/main/java/com/openautoglm/agent/ui/components/ShipmentCard.kt
+- [x] T100 [US5] Create ShipmentListScreen with consolidated deliveries view in android/app/src/main/java/com/openautoglm/agent/ui/screens/ShipmentListScreen.kt
+- [x] T101 [P] [US5] Create ShipmentCard component with status and ETA in android/app/src/main/java/com/openautoglm/agent/ui/components/ShipmentCard.kt
 
 **Checkpoint**: User Story 5 complete - logistics tracking functional
 
