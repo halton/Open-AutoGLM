@@ -1,5 +1,8 @@
 package com.openautoglm.agent.ui.screens
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -10,12 +13,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.openautoglm.agent.R
 import com.openautoglm.agent.agent.AgentState
 import com.openautoglm.agent.ui.components.TaskProgressComponent
+import com.openautoglm.agent.ui.components.VoiceInputIconButton
 import com.openautoglm.agent.ui.viewmodels.TaskViewModel
+import com.openautoglm.agent.voice.AudioPermissionState
+import com.openautoglm.agent.voice.PermissionHandler
+import com.openautoglm.agent.voice.PermissionRationaleDialog
+import com.openautoglm.agent.voice.VoiceInputState
 
 /**
  * Main screen for task creation and execution.
@@ -36,6 +46,84 @@ fun TaskScreen(
     var taskInput by remember { mutableStateOf("") }
     val scrollState = rememberScrollState()
 
+    // Voice input state
+    val voiceInputState by viewModel.voiceInputState.collectAsState()
+    val audioPermissionState by viewModel.audioPermissionState.collectAsState()
+    val isVoiceAvailable = viewModel.isVoiceInputAvailable
+
+    // Permission rationale dialog state
+    var showPermissionRationale by remember { mutableStateOf(false) }
+
+    // Permission launcher
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        val newState = if (isGranted) {
+            AudioPermissionState.GRANTED
+        } else {
+            PermissionHandler.checkAudioPermissionState(context)
+        }
+        viewModel.updateAudioPermissionState(newState)
+
+        // Start voice input if permission was granted
+        if (isGranted) {
+            viewModel.startVoiceInput()
+        }
+    }
+
+    // Handle voice input result - update task input when transcription is ready
+    LaunchedEffect(voiceInputState) {
+        when (val state = voiceInputState) {
+            is VoiceInputState.Result -> {
+                if (state.transcription.isNotBlank()) {
+                    taskInput = state.transcription
+                }
+                viewModel.resetVoiceInput()
+            }
+            else -> { /* Other states handled by UI */ }
+        }
+    }
+
+    // Voice button click handler
+    val onVoiceButtonClick: () -> Unit = {
+        when (voiceInputState) {
+            is VoiceInputState.Listening -> {
+                // Stop listening and process result
+                viewModel.stopVoiceInput()
+            }
+            is VoiceInputState.Processing -> {
+                // Do nothing while processing
+            }
+            else -> {
+                // Check permission and start listening
+                when (audioPermissionState) {
+                    AudioPermissionState.GRANTED -> {
+                        viewModel.startVoiceInput()
+                    }
+                    AudioPermissionState.NOT_REQUESTED,
+                    AudioPermissionState.DENIED_SHOW_RATIONALE,
+                    AudioPermissionState.UNKNOWN -> {
+                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                    AudioPermissionState.PERMANENTLY_DENIED -> {
+                        showPermissionRationale = true
+                    }
+                }
+            }
+        }
+    }
+
+    // Permission rationale dialog
+    if (showPermissionRationale) {
+        PermissionRationaleDialog(
+            onDismiss = { showPermissionRationale = false },
+            onOpenSettings = {
+                showPermissionRationale = false
+                PermissionHandler.openAppSettings(context)
+            }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -50,7 +138,7 @@ fun TaskScreen(
             color = MaterialTheme.colorScheme.primary
         )
 
-        // Task input field
+        // Task input field with voice input button
         OutlinedTextField(
             value = taskInput,
             onValueChange = { taskInput = it },
@@ -59,7 +147,45 @@ fun TaskScreen(
             modifier = Modifier.fillMaxWidth(),
             minLines = 3,
             maxLines = 6,
-            enabled = agentState is AgentState.Idle
+            enabled = agentState is AgentState.Idle,
+            trailingIcon = {
+                if (isVoiceAvailable && agentState is AgentState.Idle) {
+                    VoiceInputIconButton(
+                        voiceState = voiceInputState,
+                        permissionState = audioPermissionState,
+                        onClick = onVoiceButtonClick,
+                        enabled = agentState is AgentState.Idle
+                    )
+                }
+            },
+            supportingText = {
+                // Show voice input status
+                when (val state = voiceInputState) {
+                    is VoiceInputState.Listening -> {
+                        Text(
+                            text = if (state.partialText.isNotEmpty()) {
+                                state.partialText
+                            } else {
+                                stringResource(R.string.voice_listening)
+                            },
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    is VoiceInputState.Processing -> {
+                        Text(
+                            text = stringResource(R.string.voice_processing),
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                    is VoiceInputState.Error -> {
+                        Text(
+                            text = state.message,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    else -> { /* No supporting text for Idle or Result */ }
+                }
+            }
         )
 
         // Quick suggestions

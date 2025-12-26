@@ -210,3 +210,130 @@ ELSE:
 | App knowledge format | JSON with existing Python port | Constitution compliance |
 
 **All NEEDS CLARIFICATION items resolved. Ready for Phase 1.**
+
+---
+
+## Voice Input Extension (Added 2025-12-20)
+
+This section documents research for adding voice input capabilities to task creation.
+
+### 10. Voice Recognition API Selection
+
+#### Decision: Android SpeechRecognizer API
+
+**Rationale**:
+- **Built-in**: No additional dependencies (aligns with Constitution III: Minimal Dependencies)
+- **Mature**: Stable API since Android 3.0, well-documented
+- **Privacy-friendly**: Supports on-device recognition on Android 11+
+- **Multi-language**: Native support for Chinese, English, and 100+ languages
+- **Familiar UX**: Users accustomed to Google's voice input patterns
+
+**Alternatives Considered**:
+| Alternative | Evaluation | Rejected Because |
+|-------------|-----------|------------------|
+| Google Cloud Speech-to-Text | High accuracy, many features | Network dependency, API key management, per-request cost |
+| OpenAI Whisper (local) | State-of-art accuracy, open source | 1.5GB model size, requires ONNX runtime, battery impact |
+| Vosk | Offline-first, multiple languages | 40-100MB models, lower accuracy than Google |
+| Azure Speech Services | Enterprise-grade, high accuracy | Vendor lock-in, Azure account required, cost |
+
+**API Overview**:
+```kotlin
+// Core components
+android.speech.SpeechRecognizer  // Main recognizer class
+android.speech.RecognizerIntent  // Intent configuration for recognition
+android.speech.RecognitionListener // Callback interface for results
+
+// Key methods
+SpeechRecognizer.createSpeechRecognizer(context)
+SpeechRecognizer.isRecognitionAvailable(context)
+recognizer.startListening(intent)
+recognizer.stopListening()
+recognizer.cancel()
+```
+
+### 11. Voice Permission Handling
+
+#### Decision: Runtime Permission with Rationale Dialog
+
+**Implementation Pattern (Jetpack Compose)**:
+```kotlin
+val permissionLauncher = rememberLauncherForActivityResult(
+    ActivityResultContracts.RequestPermission()
+) { isGranted ->
+    if (isGranted) startListening() else showPermissionDeniedMessage()
+}
+```
+
+**Permission States**:
+| State | Detection | UI Response |
+|-------|-----------|-------------|
+| Granted | `checkSelfPermission() == GRANTED` | Show enabled mic button |
+| Not requested | First launch | Request permission on mic tap |
+| Denied once | `shouldShowRequestPermissionRationale()` true | Show rationale dialog |
+| Permanently denied | Denied + rationale false | Show "enable in settings" message |
+
+### 12. Voice UI Design Patterns
+
+#### Decision: In-Field Microphone Button with Visual Feedback
+
+**UI State Flow**:
+```
+Idle → (tap mic) → Listening → (speech) → Processing → Result → Idle
+                        ↓                      ↓
+                   error/timeout          failed
+                        ↓                      ↓
+                     Error ─────────────────► Idle
+```
+
+**Selected Pattern**: Inline mic button with bottom sheet overlay
+- Microphone icon as trailing icon in OutlinedTextField
+- Tapping opens bottom sheet with listening UI
+- Real-time transcription shown in bottom sheet
+- Tap to confirm or dismiss
+
+### 13. Multi-language Voice Recognition
+
+#### Decision: Language from AgentConfig with Locale Mapping
+
+**Locale Mapping**:
+```kotlin
+val speechLocale = when (agentConfig.language) {
+    "zh" -> Locale.CHINESE
+    "en" -> Locale.US
+    else -> Locale.getDefault()
+}
+```
+
+**RecognizerIntent Configuration**:
+```kotlin
+val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+    putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale.toLanguageTag())
+    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+}
+```
+
+### Voice Input Error Codes
+
+| Code | Constant | Description | Recovery |
+|------|----------|-------------|----------|
+| 1 | ERROR_NETWORK_TIMEOUT | Network timed out | Retry or use offline |
+| 2 | ERROR_NETWORK | Network error | Check connectivity |
+| 3 | ERROR_AUDIO | Audio recording error | Check microphone |
+| 5 | ERROR_CLIENT | Client error | Restart recognizer |
+| 6 | ERROR_SPEECH_TIMEOUT | No speech detected | Prompt user to speak |
+| 7 | ERROR_NO_MATCH | No recognition match | Allow manual input |
+| 9 | ERROR_INSUFFICIENT_PERMISSIONS | Missing permission | Request permission |
+
+---
+
+## Voice Input Resolved Unknowns
+
+| Unknown | Resolution | Source |
+|---------|------------|--------|
+| Speech recognition API | Android SpeechRecognizer | Research |
+| Permission handling | Runtime with rationale | Android best practices |
+| Multi-language support | Locale from AgentConfig | Design decision |
+| UI pattern | Inline mic + bottom sheet | UX research |
+| Error handling | Graceful degradation with retry | Constitution compliance |

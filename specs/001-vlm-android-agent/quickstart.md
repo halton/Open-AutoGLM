@@ -288,3 +288,83 @@ Solution:
 - [Data Model](./data-model.md)
 - [API Contracts](./contracts/)
 - [Research Notes](./research.md)
+
+---
+
+## Voice Input Feature (Added 2025-12-20)
+
+The AutoGLM agent now supports voice input for creating tasks. Speak your task description naturally instead of typing.
+
+### Enabling Voice Input
+
+#### 1. Grant Microphone Permission
+
+When you first tap the microphone button:
+
+1. Android will prompt: "Allow AutoGLM to record audio?"
+2. Tap **"Allow"** to enable voice input
+3. If you deny, voice input will be disabled (text input still works)
+
+**If you accidentally denied permission:**
+1. Go to Settings → Apps → AutoGLM → Permissions
+2. Tap "Microphone" and select "Allow"
+
+#### 2. Using Voice Input
+
+1. Open the AutoGLM app
+2. On the Task screen, tap the **microphone icon** (🎤) next to the text field
+3. A listening indicator appears - start speaking your task
+4. Speak clearly: "Find the best price for iPhone 15 on Taobao and JD"
+5. When you finish speaking, the transcription appears
+6. Review and edit the text if needed
+7. Tap **"Start Task"** to begin execution
+
+### Voice Input Tips
+
+**For Best Results:**
+- Speak at a normal pace, clearly
+- Reduce background noise if possible
+- Keep descriptions under 30 seconds
+- Include specific details: app names, product names, contacts
+
+**Language Support:**
+- Voice input language follows your agent language setting
+- Settings → Language → Chinese (中文) or English
+- Both Chinese and English speech are supported
+
+**Examples of Voice Commands:**
+
+| Say This | Agent Does |
+|----------|------------|
+| "帮我在淘宝上找一个便宜的iPhone手机壳" | Opens Taobao, searches for iPhone cases, compares prices |
+| "Send a message to John on WhatsApp" | Opens WhatsApp, finds John, composes message |
+| "Order a pizza from Domino's on Meituan" | Opens Meituan, finds Domino's, adds pizza to cart |
+| "Check my delivery status on JD" | Opens JD, navigates to order tracking |
+
+### Troubleshooting Voice Input
+
+**Voice button is grayed out:**
+- Check microphone permission in device settings
+- Some devices require restarting the app after granting permission
+
+**"No speech detected" error:**
+- Make sure you're speaking into the microphone
+- Check that your microphone isn't blocked or muted
+- Try speaking louder or closer to the device
+
+**Poor transcription accuracy:**
+- Switch to a quieter environment
+- Speak more slowly and clearly
+- Verify the language setting matches your spoken language
+
+**Voice input not available:**
+- Some devices may not support SpeechRecognizer
+- Ensure Google app is installed (provides speech services)
+- Try updating Google app from Play Store
+
+### Privacy Note
+
+Voice recognition uses Android's built-in speech recognition service:
+- On Android 11+, speech can be processed on-device (no network)
+- Audio is not stored by AutoGLM - only the transcribed text
+- You can enable "Prefer Offline" in Settings for maximum privacy

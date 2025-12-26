@@ -410,6 +410,7 @@
 - **User Story 6 (P3)**: Can start after Foundational - No dependencies on other stories
 - **User Story 7 (P3)**: Can start after Foundational - No dependencies on other stories
 - **User Story 8 (P3)**: Can start after Foundational - No dependencies on other stories
+- **Voice Input (Enhancement)**: Requires TaskScreen and TaskViewModel to exist (Phase 3 US1 completion) - Independent of other user stories
 
 ### Within Each User Story
 
@@ -453,6 +454,24 @@ Task: "Implement NavigationAction handler in android/.../actions/handlers/Naviga
 Task: "Add Taobao app mapping in android/.../assets/app_mappings.json"
 Task: "Add JD.com app mapping in android/.../assets/app_mappings.json"
 Task: "Add Amazon app mapping in android/.../assets/app_mappings.json"
+```
+
+## Parallel Example: Voice Input Phase
+
+```bash
+# Launch data model classes in parallel (T139-T142):
+Task: "Create VoiceInputState sealed class in android/.../voice/VoiceInputState.kt"
+Task: "Create VoiceInputConfig data class in android/.../voice/VoiceInputConfig.kt"
+Task: "Create VoiceErrorCode enum in android/.../voice/VoiceErrorCode.kt"
+Task: "Create AudioPermissionState enum in android/.../voice/AudioPermissionState.kt"
+
+# Launch drawable icons in parallel (T149-T150):
+Task: "Create ic_mic.xml vector drawable in android/.../res/drawable/ic_mic.xml"
+Task: "Create ic_mic_off.xml vector drawable in android/.../res/drawable/ic_mic_off.xml"
+
+# Launch bilingual strings in parallel (T157-T158):
+Task: "Add voice input strings (English) to android/.../res/values/strings.xml"
+Task: "Add voice input strings (Chinese) to android/.../res/values-zh/strings.xml"
 ```
 
 ---
@@ -508,10 +527,88 @@ Total MVP tasks: 64 tasks (T001-T064)
 
 ---
 
+## Phase 12: Voice Input for Task Creation (Priority: Enhancement)
+
+**Goal**: Enable users to create tasks using voice input as an alternative to typing
+
+**Independent Test**: Tap microphone button, speak task description, verify transcription appears in text field
+
+**Added**: 2025-12-20 via plan.md update for voice support
+
+### Voice Input Data Model
+
+- [ ] T139 [P] [VOICE] Create VoiceInputState sealed class (Idle, Listening, Processing, Result, Error) in android/app/src/main/java/com/openautoglm/agent/voice/VoiceInputState.kt
+- [ ] T140 [P] [VOICE] Create VoiceInputConfig data class with locale and timeout settings in android/app/src/main/java/com/openautoglm/agent/voice/VoiceInputConfig.kt
+- [ ] T141 [P] [VOICE] Create VoiceErrorCode enum with bilingual error messages in android/app/src/main/java/com/openautoglm/agent/voice/VoiceErrorCode.kt
+- [ ] T142 [P] [VOICE] Create AudioPermissionState enum in android/app/src/main/java/com/openautoglm/agent/voice/AudioPermissionState.kt
+
+### Voice Input Core Implementation
+
+- [ ] T143 [VOICE] Create VoiceInputManager interface and implementation wrapping Android SpeechRecognizer in android/app/src/main/java/com/openautoglm/agent/voice/VoiceInputManager.kt
+- [ ] T144 [VOICE] Implement RecognitionListener callbacks (onResults, onPartialResults, onError) in android/app/src/main/java/com/openautoglm/agent/voice/VoiceInputManager.kt
+- [ ] T145 [VOICE] Implement locale mapping from AgentConfig.language to Android Locale in android/app/src/main/java/com/openautoglm/agent/voice/VoiceInputManager.kt
+
+### Android Permissions
+
+- [ ] T146 [VOICE] Add RECORD_AUDIO permission to AndroidManifest.xml in android/app/src/main/AndroidManifest.xml
+- [ ] T147 [VOICE] Implement runtime permission request for RECORD_AUDIO using ActivityResultContracts in android/app/src/main/java/com/openautoglm/agent/voice/PermissionHandler.kt
+- [ ] T148 [VOICE] Implement permission rationale dialog and settings redirect in android/app/src/main/java/com/openautoglm/agent/voice/PermissionHandler.kt
+
+### Voice Input UI Components
+
+- [ ] T149 [P] [VOICE] Create ic_mic.xml vector drawable for microphone icon in android/app/src/main/res/drawable/ic_mic.xml
+- [ ] T150 [P] [VOICE] Create ic_mic_off.xml vector drawable for disabled microphone icon in android/app/src/main/res/drawable/ic_mic_off.xml
+- [ ] T151 [VOICE] Create VoiceInputButton composable with listening animation in android/app/src/main/java/com/openautoglm/agent/ui/components/VoiceInputButton.kt
+- [ ] T152 [VOICE] Implement pulsing animation for active listening state in android/app/src/main/java/com/openautoglm/agent/ui/components/VoiceInputButton.kt
+
+### Voice Input Integration
+
+- [ ] T153 [VOICE] Add voiceInputState StateFlow to TaskViewModel in android/app/src/main/java/com/openautoglm/agent/ui/viewmodels/TaskViewModel.kt
+- [ ] T154 [VOICE] Add startVoiceInput(), stopVoiceInput(), cancelVoiceInput() methods to TaskViewModel in android/app/src/main/java/com/openautoglm/agent/ui/viewmodels/TaskViewModel.kt
+- [ ] T155 [VOICE] Integrate VoiceInputButton as trailing icon in TaskScreen OutlinedTextField in android/app/src/main/java/com/openautoglm/agent/ui/screens/TaskScreen.kt
+- [ ] T156 [VOICE] Implement voice transcription result population into taskInput state in android/app/src/main/java/com/openautoglm/agent/ui/screens/TaskScreen.kt
+
+### Voice Input Strings (Bilingual)
+
+- [ ] T157 [VOICE] Add voice input strings (English) to strings.xml in android/app/src/main/res/values/strings.xml
+- [ ] T158 [P] [VOICE] Add voice input strings (Chinese) to strings.xml in android/app/src/main/res/values-zh/strings.xml
+
+### Voice Input Error Handling
+
+- [ ] T159 [VOICE] Implement voice input error display in TaskScreen in android/app/src/main/java/com/openautoglm/agent/ui/screens/TaskScreen.kt
+- [ ] T160 [VOICE] Implement retry logic for retryable voice errors in android/app/src/main/java/com/openautoglm/agent/voice/VoiceInputManager.kt
+
+**Checkpoint**: Voice Input complete - users can create tasks via voice
+
+---
+
+## Updated Summary (with Voice Input)
+
+| Metric | Count |
+|--------|-------|
+| **Total Tasks** | 160 |
+| **Setup Phase** | 6 tasks |
+| **Foundational Phase** | 36 tasks |
+| **User Story 1 (P1)** | 22 tasks |
+| **User Story 2 (P1)** | 9 tasks |
+| **User Story 3 (P2)** | 10 tasks |
+| **User Story 4 (P2)** | 10 tasks |
+| **User Story 5 (P2)** | 8 tasks |
+| **User Story 6 (P3)** | 6 tasks |
+| **User Story 7 (P3)** | 8 tasks |
+| **User Story 8 (P3)** | 7 tasks |
+| **Polish Phase** | 16 tasks |
+| **Voice Input Phase** | 22 tasks |
+| **Parallel Opportunities** | 52 tasks marked [P] |
+| **MVP Tasks** | 64 tasks |
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies
 - [Story] label maps task to specific user story for traceability
+- [VOICE] label indicates voice input feature tasks
 - Each user story should be independently completable and testable
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently
