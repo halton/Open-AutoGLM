@@ -17,6 +17,8 @@ import com.openautoglm.agent.voice.VoiceInputConfig
 import com.openautoglm.agent.voice.VoiceInputManager
 import com.openautoglm.agent.voice.VoiceInputManagerImpl
 import com.openautoglm.agent.voice.VoiceInputState
+import com.openautoglm.agent.service.PauseResumeController
+import com.openautoglm.agent.service.PauseResumeEvent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,6 +56,31 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     val agentState: StateFlow<AgentState> = agent.agentState
+
+    init {
+        // Listen for pause/resume events from the floating overlay
+        viewModelScope.launch {
+            PauseResumeController.pauseResumeEvents.collect { event ->
+                android.util.Log.i("TaskViewModel", "Received pause/resume event: $event")
+                handlePauseResumeEvent(event)
+            }
+        }
+    }
+
+    private fun handlePauseResumeEvent(event: PauseResumeEvent) {
+        when (event) {
+            is PauseResumeEvent.Toggle -> {
+                val currentState = agentState.value
+                if (currentState is AgentState.Running) {
+                    pauseTask()
+                } else if (currentState is AgentState.Paused) {
+                    resumeTask()
+                }
+            }
+            is PauseResumeEvent.Pause -> pauseTask()
+            is PauseResumeEvent.Resume -> resumeTask()
+        }
+    }
 
     // Voice input support
     private val voiceInputManager: VoiceInputManager = VoiceInputManagerImpl(
@@ -168,9 +195,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
      * Resumes a paused task.
      */
     fun resumeTask() {
-        viewModelScope.launch {
-            agent.step()
-        }
+        agent.resume()
     }
 
     /**

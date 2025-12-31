@@ -85,6 +85,16 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
+        <!-- Floating Overlay Service for status display -->
+        <service
+            android:name=".service.FloatingOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Floating status overlay for task monitoring" />
+        </service>
+
     </application>
 
 </manifest>

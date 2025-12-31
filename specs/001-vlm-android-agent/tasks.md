@@ -376,6 +376,20 @@
 - [ ] T133 Implement task pause/resume functionality (FR-006) in android/app/src/main/java/com/openautoglm/agent/agent/TaskStateManager.kt
 - [ ] T134 Implement task cancellation handling (FR-010) in android/app/src/main/java/com/openautoglm/agent/agent/TaskCancellationHandler.kt
 
+### Task History Enhancement
+
+- [x] T134a Implement task redo functionality from history (re-execute previous task with same parameters) in android/app/src/main/java/com/openautoglm/agent/agent/TaskRedoHandler.kt
+- [x] T134b Add redo button/action to HistoryScreen task items in android/app/src/main/java/com/openautoglm/agent/ui/screens/HistoryScreen.kt
+
+### Floating Overlay Enhancement
+
+- [ ] T134c Create FloatingOverlayService with system overlay window in android/app/src/main/java/com/openautoglm/agent/service/FloatingOverlayService.kt
+- [ ] T134d Implement overlay state display (idle/thinking/executing/paused/error animations) in android/app/src/main/java/com/openautoglm/agent/ui/overlay/OverlayView.kt
+- [ ] T134e Add tap interaction for pause/resume toggle on overlay in android/app/src/main/java/com/openautoglm/agent/ui/overlay/OverlayView.kt
+- [ ] T134f Add long-press to show status popup with current step info in android/app/src/main/java/com/openautoglm/agent/ui/overlay/OverlayView.kt
+- [ ] T134g Integrate FloatingOverlayService with PhoneAgent state updates in android/app/src/main/java/com/openautoglm/agent/agent/PhoneAgent.kt
+- [ ] T134h Add SYSTEM_ALERT_WINDOW permission request flow in android/app/src/main/java/com/openautoglm/agent/ui/MainActivity.kt
+
 ### Documentation Updates
 
 - [ ] T135 [P] Update README.md with Android app installation instructions (bilingual - Chinese)

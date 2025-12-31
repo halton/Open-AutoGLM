@@ -35,16 +35,28 @@ import com.openautoglm.agent.voice.VoiceInputState
  * - Start/stop/pause controls
  * - Real-time progress display
  * - Task result display
+ * - Support for pre-filled task descriptions (e.g., from redo)
+ *
+ * @param viewModel The TaskViewModel instance
+ * @param initialTaskDescription Optional pre-filled task description (e.g., from redo action)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskScreen(
-    viewModel: TaskViewModel = viewModel()
+    viewModel: TaskViewModel = viewModel(),
+    initialTaskDescription: String? = null
 ) {
     val context = LocalContext.current
     val agentState by viewModel.agentState.collectAsState()
-    var taskInput by remember { mutableStateOf("") }
+    var taskInput by remember { mutableStateOf(initialTaskDescription ?: "") }
     val scrollState = rememberScrollState()
+
+    // Update taskInput if initialTaskDescription changes (e.g., from redo)
+    LaunchedEffect(initialTaskDescription) {
+        if (!initialTaskDescription.isNullOrBlank()) {
+            taskInput = initialTaskDescription
+        }
+    }
 
     // Voice input state
     val voiceInputState by viewModel.voiceInputState.collectAsState()

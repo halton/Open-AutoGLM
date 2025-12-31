@@ -4,7 +4,10 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -37,6 +40,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.openautoglm.agent.R
 import com.openautoglm.agent.accessibility.ScreenCaptureManager
+import com.openautoglm.agent.agent.TaskRedoHandler
 import com.openautoglm.agent.ui.screens.HistoryScreen
 import com.openautoglm.agent.ui.screens.ModelDownloadScreen
 import com.openautoglm.agent.ui.screens.SettingsScreen
@@ -55,11 +59,16 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
+        private const val REQUEST_OVERLAY_PERMISSION = 1001
 
         @Volatile
         private var screenCapturePermissionGranted = false
 
+        @Volatile
+        private var overlayPermissionGranted = false
+
         fun isScreenCapturePermissionGranted() = screenCapturePermissionGranted
+        fun isOverlayPermissionGranted() = overlayPermissionGranted
     }
 
     private val screenCaptureManager by lazy {
@@ -90,6 +99,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Check and request overlay permission first
+        checkOverlayPermission()
+
         // Request screen capture permission on startup
         requestScreenCapturePermission()
 
@@ -100,6 +112,55 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     MainScreen()
+                }
+            }
+        }
+    }
+
+    private fun checkOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Settings.canDrawOverlays(this)) {
+                overlayPermissionGranted = true
+                Log.i(TAG, "Overlay permission already granted")
+            } else {
+                overlayPermissionGranted = false
+                Log.w(TAG, "Overlay permission not granted, requesting...")
+                requestOverlayPermission()
+            }
+        } else {
+            // Pre-M devices don't need runtime permission
+            overlayPermissionGranted = true
+        }
+    }
+
+    private fun requestOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION)
+            Toast.makeText(
+                this,
+                "Please enable overlay permission for floating status display",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_OVERLAY_PERMISSION) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                overlayPermissionGranted = Settings.canDrawOverlays(this)
+                if (overlayPermissionGranted) {
+                    Log.i(TAG, "Overlay permission granted")
+                    Toast.makeText(this, "Overlay permission granted", Toast.LENGTH_SHORT).show()
+                } else {
+                    Log.w(TAG, "Overlay permission denied")
+                    Toast.makeText(this, "Overlay permission denied - floating status will not work", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -206,16 +267,34 @@ fun NavigationHost(
     navController: NavHostController,
     modifier: Modifier = Modifier
 ) {
+    // State to hold pending redo task description
+    var pendingRedoTask by remember { mutableStateOf<String?>(null) }
+
     NavHost(
         navController = navController,
         startDestination = Screen.Tasks.route,
         modifier = modifier
     ) {
         composable(Screen.Tasks.route) {
-            TaskScreen()
+            // Pass and consume pending redo task
+            val redoTask = pendingRedoTask
+            pendingRedoTask = null
+            TaskScreen(initialTaskDescription = redoTask)
         }
         composable(Screen.History.route) {
-            HistoryScreen()
+            HistoryScreen(
+                onRedoTask = { redoInfo ->
+                    // Store the task description and navigate to Tasks screen
+                    pendingRedoTask = redoInfo.description
+                    navController.navigate(Screen.Tasks.route) {
+                        popUpTo(navController.graph.startDestinationId) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = false // Don't restore state to ensure fresh TaskScreen
+                    }
+                }
+            )
         }
         composable(Screen.Settings.route) {
             SettingsScreen(
