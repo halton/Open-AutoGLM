@@ -11,8 +11,11 @@ import com.openautoglm.agent.data.AgentRepository
 import com.openautoglm.agent.data.AppDatabase
 import com.openautoglm.agent.inference.CloudInference
 import com.openautoglm.agent.inference.InferenceRouterImpl
+import com.openautoglm.agent.inference.SecureKeyStorage
 import com.openautoglm.agent.voice.AudioPermissionState
 import com.openautoglm.agent.voice.PermissionHandler
+import com.openautoglm.agent.voice.SpeechRecognizerType
+import com.openautoglm.agent.voice.UnifiedVoiceInputManager
 import com.openautoglm.agent.voice.VoiceInputConfig
 import com.openautoglm.agent.voice.VoiceInputManager
 import com.openautoglm.agent.voice.VoiceInputManagerImpl
@@ -82,9 +85,17 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Voice input support
-    private val voiceInputManager: VoiceInputManager = VoiceInputManagerImpl(
+    // Voice input support - uses UnifiedVoiceInputManager to support both Android and Vosk
+    private val secureStorage = SecureKeyStorage(application)
+    private val speechRecognizerType: SpeechRecognizerType = try {
+        SpeechRecognizerType.valueOf(secureStorage.getSpeechRecognizerType())
+    } catch (e: IllegalArgumentException) {
+        SpeechRecognizerType.ANDROID_BUILTIN
+    }
+
+    private val voiceInputManager: VoiceInputManager = UnifiedVoiceInputManager(
         context = application,
+        initialType = speechRecognizerType,
         config = VoiceInputConfig.fromAgentLanguage(config.language),
         language = config.language
     )
