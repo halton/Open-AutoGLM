@@ -107,6 +107,10 @@ class VoiceInputManagerImpl(
     private var isListening = false
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    // Track last partial result as fallback for when onResults comes empty
+    // Some Android versions/devices don't deliver results properly but do deliver partials
+    private var lastPartialResult: String? = null
+
     override val isAvailable: Boolean
         get() = SpeechRecognizer.isRecognitionAvailable(context)
 
@@ -144,21 +148,33 @@ class VoiceInputManagerImpl(
             return
         }
 
-        if (isListening) {
-            cancelListening()
-        }
-
         val intent = createRecognizerIntent(locale)
         Log.d(TAG, "Starting speech recognition with locale: ${getLanguageTagForSpeechRecognizer(locale)}")
 
         // Ensure we run on main thread
         val startAction = {
             try {
-                // Re-initialize if needed (may have been destroyed or not yet created)
-                if (speechRecognizer == null) {
-                    initializeSpeechRecognizer()
+                // Reset last partial result for new session
+                lastPartialResult = null
+
+                // Always destroy and recreate SpeechRecognizer for each session
+                // This ensures the RecognitionListener is properly bound and callbacks are delivered
+                // The previous "reuse" approach caused callback delivery issues with Google Speech Services
+                speechRecognizer?.let { recognizer ->
+                    Log.d(TAG, "Destroying previous SpeechRecognizer instance")
+                    recognizer.cancel()
+                    recognizer.destroy()
                 }
-                speechRecognizer?.startListening(intent)
+                isListening = false
+
+                // Create fresh SpeechRecognizer with listener
+                Log.d(TAG, "Creating new SpeechRecognizer instance")
+                val newRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+                newRecognizer.setRecognitionListener(this@VoiceInputManagerImpl)
+                speechRecognizer = newRecognizer
+
+                Log.d(TAG, "Calling startListening on SpeechRecognizer")
+                newRecognizer.startListening(intent)
                 isListening = true
                 _state.value = VoiceInputState.Listening()
             } catch (e: Exception) {
@@ -253,10 +269,12 @@ class VoiceInputManagerImpl(
     // RecognitionListener callbacks
 
     override fun onReadyForSpeech(params: Bundle?) {
+        Log.d(TAG, "onReadyForSpeech called")
         _state.value = VoiceInputState.Listening()
     }
 
     override fun onBeginningOfSpeech() {
+        Log.d(TAG, "onBeginningOfSpeech called")
         // User started speaking - could update UI to show active speech
     }
 
@@ -272,10 +290,12 @@ class VoiceInputManagerImpl(
     }
 
     override fun onBufferReceived(buffer: ByteArray?) {
+        Log.d(TAG, "onBufferReceived called")
         // Raw audio buffer - not typically used
     }
 
     override fun onEndOfSpeech() {
+        Log.d(TAG, "onEndOfSpeech called")
         isListening = false
         _state.value = VoiceInputState.Processing
     }
@@ -294,18 +314,40 @@ class VoiceInputManagerImpl(
     override fun onResults(results: Bundle?) {
         isListening = false
 
+        Log.d(TAG, "onResults called, bundle: $results")
+        Log.d(TAG, "onResults bundle keys: ${results?.keySet()?.joinToString() ?: "null"}")
+
+        // Log all bundle contents for debugging
+        results?.keySet()?.forEach { key ->
+            Log.d(TAG, "Bundle key '$key' = ${results.get(key)}")
+        }
+
         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
         val confidenceScores = results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
 
-        if (!matches.isNullOrEmpty()) {
+        Log.d(TAG, "Recognition matches: $matches, confidences: ${confidenceScores?.toList()}")
+
+        if (!matches.isNullOrEmpty() && matches[0].isNotEmpty()) {
             val transcription = matches[0]
             val confidence = confidenceScores?.getOrNull(0)
+
+            Log.i(TAG, "Recognized speech: '$transcription' (confidence: $confidence)")
 
             _state.value = VoiceInputState.Result(
                 transcription = transcription,
                 confidence = confidence
             )
+        } else if (!lastPartialResult.isNullOrEmpty()) {
+            // Fallback: use last partial result when final results are empty
+            // This handles devices/Android versions where onResults comes empty but partials work
+            Log.i(TAG, "Using last partial result as fallback: '$lastPartialResult'")
+
+            _state.value = VoiceInputState.Result(
+                transcription = lastPartialResult!!,
+                confidence = null  // No confidence for partial results
+            )
         } else {
+            Log.w(TAG, "Empty recognition results and no partial fallback")
             _state.value = VoiceInputState.Error(
                 message = VoiceErrorCode.NO_MATCH.getMessage(language),
                 errorCode = SpeechRecognizer.ERROR_NO_MATCH,
@@ -315,17 +357,37 @@ class VoiceInputManagerImpl(
     }
 
     override fun onPartialResults(partialResults: Bundle?) {
+        Log.d(TAG, "onPartialResults called")
         val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
 
         if (!matches.isNullOrEmpty()) {
+            val partialText = matches[0]
+            Log.d(TAG, "Partial result: $partialText")
+
+            // Save non-empty partial results as fallback for onResults
+            if (partialText.isNotEmpty()) {
+                lastPartialResult = partialText
+            }
+
             val currentState = _state.value
-            if (currentState is VoiceInputState.Listening) {
-                _state.value = currentState.copy(partialText = matches[0])
+
+            // On some devices/Android versions, the final result is delivered via onPartialResults
+            // after onEndOfSpeech (state becomes Processing), but onResults is never called.
+            // In this case, treat the partial result with non-empty text as the final result.
+            if (currentState is VoiceInputState.Processing && partialText.isNotEmpty()) {
+                Log.i(TAG, "Treating partial result as final (state=Processing): '$partialText'")
+                _state.value = VoiceInputState.Result(
+                    transcription = partialText,
+                    confidence = null
+                )
+            } else if (currentState is VoiceInputState.Listening) {
+                _state.value = currentState.copy(partialText = partialText)
             }
         }
     }
 
     override fun onEvent(eventType: Int, params: Bundle?) {
+        Log.d(TAG, "onEvent called: type=$eventType")
         // Reserved for future events
     }
 }

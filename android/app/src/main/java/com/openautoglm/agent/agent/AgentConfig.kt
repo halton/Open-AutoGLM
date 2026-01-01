@@ -21,7 +21,7 @@ import com.openautoglm.agent.data.entities.InferenceMode
  */
 data class AgentConfig(
     val inferenceMode: InferenceMode = InferenceMode.AUTO,
-    val language: String = "en",
+    val language: String = "zh",  // Default to Chinese for voice recognition
     val maxRetries: Int = 3,
     val actionTimeout: Long = 30_000L,  // 30 seconds
     val maxStepsPerTask: Int = 50,
