@@ -25,6 +25,8 @@ import com.openautoglm.agent.ui.viewmodels.SettingsViewModel
 import com.openautoglm.agent.voice.SpeechRecognizerType
 import com.openautoglm.agent.voice.VoskModelDownloadState
 import com.openautoglm.agent.voice.VoskModelInfo
+import com.openautoglm.agent.voice.WhisperModelDownloadState
+import com.openautoglm.agent.voice.WhisperModelInfo
 
 /**
  * Screen for app settings.
@@ -791,6 +793,7 @@ private fun VoiceRecognitionSettings(
     uiState: com.openautoglm.agent.ui.viewmodels.SettingsUiState
 ) {
     val voskDownloadState by viewModel.voskDownloadState.collectAsState()
+    val whisperDownloadState by viewModel.whisperDownloadState.collectAsState()
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
@@ -799,7 +802,7 @@ private fun VoiceRecognitionSettings(
         )
 
         Text(
-            text = "Choose between online (Google) or offline (Vosk) speech recognition.",
+            text = "Choose speech recognition engine: Google (online), Vosk (fast offline), or Whisper (high-accuracy offline).",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -816,6 +819,7 @@ private fun VoiceRecognitionSettings(
                     val isEnabled = when (type) {
                         SpeechRecognizerType.ANDROID_BUILTIN -> true
                         SpeechRecognizerType.VOSK_OFFLINE -> uiState.downloadedVoskModels.isNotEmpty()
+                        SpeechRecognizerType.WHISPER_OFFLINE -> uiState.downloadedWhisperModels.isNotEmpty()
                     }
 
                     Row(
@@ -836,6 +840,7 @@ private fun VoiceRecognitionSettings(
                                 text = when (type) {
                                     SpeechRecognizerType.ANDROID_BUILTIN -> "Google (Online)"
                                     SpeechRecognizerType.VOSK_OFFLINE -> "Vosk (Offline)"
+                                    SpeechRecognizerType.WHISPER_OFFLINE -> "Whisper (Offline - High Accuracy)"
                                 },
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = if (uiState.speechRecognizerType == type) FontWeight.Bold else FontWeight.Normal,
@@ -844,7 +849,8 @@ private fun VoiceRecognitionSettings(
                             Text(
                                 text = when (type) {
                                     SpeechRecognizerType.ANDROID_BUILTIN -> "Uses Google Speech Services (requires internet)"
-                                    SpeechRecognizerType.VOSK_OFFLINE -> if (isEnabled) "Fully on-device, privacy-preserving" else "Download a model below to enable"
+                                    SpeechRecognizerType.VOSK_OFFLINE -> if (isEnabled) "Fast on-device, lower accuracy" else "Download a model below to enable"
+                                    SpeechRecognizerType.WHISPER_OFFLINE -> if (isEnabled) "High accuracy multilingual (processes after recording)" else "Download a model below to enable"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -857,7 +863,7 @@ private fun VoiceRecognitionSettings(
 
         // Vosk Models Section
         Text(
-            text = "Vosk Models / 离线语音模型",
+            text = "Vosk Models (Fast / 快速)",
             style = MaterialTheme.typography.titleSmall
         )
 
@@ -880,7 +886,44 @@ private fun VoiceRecognitionSettings(
                     )
 
                     if (model != uiState.availableVoskModels.last()) {
-                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    }
+                }
+            }
+        }
+
+        // Whisper Models Section
+        Text(
+            text = "Whisper Models (High Accuracy / 高精度)",
+            style = MaterialTheme.typography.titleSmall
+        )
+
+        Text(
+            text = "Based on OpenAI's Whisper. Processes audio after recording for higher accuracy.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                uiState.availableWhisperModels.forEach { model ->
+                    val isDownloaded = uiState.downloadedWhisperModels.any { it.id == model.id }
+
+                    WhisperModelItem(
+                        model = model,
+                        isDownloaded = isDownloaded,
+                        downloadState = whisperDownloadState,
+                        onDownload = { viewModel.downloadWhisperModel(model) },
+                        onDelete = { viewModel.deleteWhisperModel(model) }
+                    )
+
+                    if (model != uiState.availableWhisperModels.last()) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     }
                 }
             }
@@ -963,6 +1006,93 @@ private fun VoskModelItem(
         } else {
             val isDownloading = downloadState is VoskModelDownloadState.Downloading ||
                 downloadState is VoskModelDownloadState.Extracting
+
+            IconButton(
+                onClick = onDownload,
+                enabled = !isDownloading
+            ) {
+                if (isDownloading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = "Download model",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Individual Whisper model item with download/delete controls.
+ */
+@Composable
+private fun WhisperModelItem(
+    model: WhisperModelInfo,
+    isDownloaded: Boolean,
+    downloadState: WhisperModelDownloadState,
+    onDownload: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "${model.name} - ${model.accuracy}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = "${model.sizeMB} MB - ${model.description}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // Show download progress
+            when (downloadState) {
+                is WhisperModelDownloadState.Downloading -> {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        progress = { downloadState.progress },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = "%.1f / %.1f MB".format(downloadState.downloadedMB, downloadState.totalMB),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                is WhisperModelDownloadState.Error -> {
+                    Text(
+                        text = "Error: ${downloadState.message}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                else -> {}
+            }
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        if (isDownloaded) {
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete model",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        } else {
+            val isDownloading = downloadState is WhisperModelDownloadState.Downloading
 
             IconButton(
                 onClick = onDownload,

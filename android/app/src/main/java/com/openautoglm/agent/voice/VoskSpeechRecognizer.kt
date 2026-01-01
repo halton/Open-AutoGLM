@@ -19,15 +19,17 @@ import java.io.File
 import java.util.Locale
 
 /**
- * Speech recognizer type to select between Android's built-in
- * SpeechRecognizer and Vosk offline recognition.
+ * Speech recognizer type to select between different speech recognition engines.
  */
 enum class SpeechRecognizerType {
     /** Android's built-in SpeechRecognizer (uses Google Speech Services online) */
     ANDROID_BUILTIN,
 
-    /** Vosk offline speech recognition (fully on-device) */
-    VOSK_OFFLINE
+    /** Vosk offline speech recognition (fully on-device, smaller models) */
+    VOSK_OFFLINE,
+
+    /** Whisper.cpp offline speech recognition (high-accuracy multilingual) */
+    WHISPER_OFFLINE
 }
 
 /**

@@ -13,6 +13,9 @@ import com.openautoglm.agent.voice.SpeechRecognizerType
 import com.openautoglm.agent.voice.VoskModelDownloadManager
 import com.openautoglm.agent.voice.VoskModelDownloadState
 import com.openautoglm.agent.voice.VoskModelInfo
+import com.openautoglm.agent.voice.WhisperModelDownloadManager
+import com.openautoglm.agent.voice.WhisperModelDownloadState
+import com.openautoglm.agent.voice.WhisperModelInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +33,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val cloudInference = CloudInference(application)
     private val downloadManager = ModelDownloadManager(application)
     private val voskModelManager = VoskModelDownloadManager(application)
+    private val whisperModelManager = WhisperModelDownloadManager(application)
 
     // UI State
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -38,10 +42,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     // Vosk download state
     val voskDownloadState: StateFlow<VoskModelDownloadState> = voskModelManager.downloadState
 
+    // Whisper download state
+    val whisperDownloadState: StateFlow<WhisperModelDownloadState> = whisperModelManager.downloadState
+
     init {
         loadCurrentSettings()
         loadDownloadedModels()
         loadVoskModels()
+        loadWhisperModels()
     }
 
     /**
@@ -107,6 +115,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         _uiState.value = _uiState.value.copy(
             availableVoskModels = availableVoskModels,
             downloadedVoskModels = downloadedVoskModels
+        )
+    }
+
+    /**
+     * Loads Whisper model information.
+     */
+    private fun loadWhisperModels() {
+        val availableWhisperModels = WhisperModelDownloadManager.AVAILABLE_MODELS
+        val downloadedWhisperModels = whisperModelManager.getDownloadedModels()
+
+        _uiState.value = _uiState.value.copy(
+            availableWhisperModels = availableWhisperModels,
+            downloadedWhisperModels = downloadedWhisperModels
         )
     }
 
@@ -384,6 +405,52 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun isVoskAvailable(locale: Locale): Boolean {
         return voskModelManager.isModelDownloaded(locale)
     }
+
+    // ========== Whisper Recognition Settings ==========
+
+    /**
+     * Downloads a Whisper model.
+     */
+    fun downloadWhisperModel(modelInfo: WhisperModelInfo) {
+        viewModelScope.launch {
+            val success = whisperModelManager.downloadModel(modelInfo)
+            if (success) {
+                loadWhisperModels()
+            }
+        }
+    }
+
+    /**
+     * Deletes a Whisper model.
+     */
+    fun deleteWhisperModel(modelInfo: WhisperModelInfo) {
+        viewModelScope.launch {
+            val success = whisperModelManager.deleteModel(modelInfo)
+            if (success) {
+                loadWhisperModels()
+                // If current type is Whisper and no models left, switch to Android
+                if (_uiState.value.speechRecognizerType == SpeechRecognizerType.WHISPER_OFFLINE &&
+                    whisperModelManager.getDownloadedModels().isEmpty()
+                ) {
+                    updateSpeechRecognizerType(SpeechRecognizerType.ANDROID_BUILTIN)
+                }
+            }
+        }
+    }
+
+    /**
+     * Resets Whisper download state to idle.
+     */
+    fun resetWhisperDownloadState() {
+        whisperModelManager.resetState()
+    }
+
+    /**
+     * Checks if Whisper is available (any model downloaded).
+     */
+    fun isWhisperAvailable(): Boolean {
+        return whisperModelManager.getDownloadedModels().isNotEmpty()
+    }
 }
 
 /**
@@ -411,5 +478,8 @@ data class SettingsUiState(
     // Voice recognition settings
     val speechRecognizerType: SpeechRecognizerType = SpeechRecognizerType.ANDROID_BUILTIN,
     val availableVoskModels: List<VoskModelInfo> = emptyList(),
-    val downloadedVoskModels: List<VoskModelInfo> = emptyList()
+    val downloadedVoskModels: List<VoskModelInfo> = emptyList(),
+    // Whisper models
+    val availableWhisperModels: List<WhisperModelInfo> = emptyList(),
+    val downloadedWhisperModels: List<WhisperModelInfo> = emptyList()
 )

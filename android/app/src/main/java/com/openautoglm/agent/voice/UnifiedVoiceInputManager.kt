@@ -40,6 +40,10 @@ object VoiceInputManagerFactory {
                 Log.d(TAG, "Creating Vosk offline SpeechRecognizer")
                 VoskSpeechRecognizer(context, config, language)
             }
+            SpeechRecognizerType.WHISPER_OFFLINE -> {
+                Log.d(TAG, "Creating Whisper.cpp offline SpeechRecognizer")
+                WhisperSpeechRecognizer(context, config, language)
+            }
         }
     }
 
@@ -48,6 +52,13 @@ object VoiceInputManagerFactory {
      */
     fun isVoskAvailable(context: Context, locale: Locale): Boolean {
         return VoskSpeechRecognizer.isModelDownloaded(context, locale)
+    }
+
+    /**
+     * Check if Whisper is available (model downloaded).
+     */
+    fun isWhisperAvailable(context: Context, modelName: String = WhisperSpeechRecognizer.MODEL_NAME_TINY): Boolean {
+        return WhisperSpeechRecognizer.isModelDownloaded(context, modelName)
     }
 
     /**
@@ -112,6 +123,12 @@ class UnifiedVoiceInputManager(
         // Check if Vosk is available when switching to it
         if (type == SpeechRecognizerType.VOSK_OFFLINE && !VoiceInputManagerFactory.isVoskAvailable(context, config.locale)) {
             Log.w(TAG, "Cannot switch to Vosk - model not downloaded for ${config.locale}")
+            return false
+        }
+
+        // Check if Whisper is available when switching to it
+        if (type == SpeechRecognizerType.WHISPER_OFFLINE && !VoiceInputManagerFactory.isWhisperAvailable(context)) {
+            Log.w(TAG, "Cannot switch to Whisper - model not downloaded")
             return false
         }
 

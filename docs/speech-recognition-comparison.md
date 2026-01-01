@@ -129,15 +129,37 @@ This document compares speech recognition options for the Open-AutoGLM Android a
 
 ## Current Implementation
 
-The Open-AutoGLM app currently uses Android's built-in `SpeechRecognizer` API with:
-- Online recognition via Google Speech Services
-- Offline mode disabled (`preferOffline = false`) due to SODA session management issues
-- Chinese locale support (`zh-CN`) with extended silence timeout (3000ms)
-- Fallback to partial results when final results are empty
+The Open-AutoGLM app now supports **three speech recognition options**:
 
-See implementation in:
-- `android/app/src/main/java/com/openautoglm/agent/voice/VoiceInputManager.kt`
-- `android/app/src/main/java/com/openautoglm/agent/voice/VoiceInputConfig.kt`
+### 1. Android SpeechRecognizer (Online - Default)
+- Uses Google Speech Services for recognition
+- Requires network connection
+- Real-time streaming with partial results
+- Chinese locale support (`zh-CN`) with extended silence timeout
+
+### 2. Vosk (Offline - Fast)
+- Lightweight on-device recognition (~42MB Chinese model)
+- Fully offline, no network required
+- Fast real-time streaming recognition
+- Lower accuracy compared to Whisper
+- Privacy-preserving (all processing on device)
+
+### 3. Whisper.cpp (Offline - High Accuracy)
+- Based on OpenAI's Whisper model
+- High accuracy multilingual recognition
+- Processes audio after recording (not streaming)
+- Larger model sizes (75MB tiny, 142MB base, 466MB small)
+- Best for accuracy-critical applications
+
+**Implementation files:**
+- `android/app/src/main/java/com/openautoglm/agent/voice/VoiceInputManager.kt` - Android SpeechRecognizer
+- `android/app/src/main/java/com/openautoglm/agent/voice/VoskSpeechRecognizer.kt` - Vosk implementation
+- `android/app/src/main/java/com/openautoglm/agent/voice/WhisperSpeechRecognizer.kt` - Whisper.cpp implementation
+- `android/app/src/main/java/com/openautoglm/agent/voice/UnifiedVoiceInputManager.kt` - Unified manager for switching
+- `android/app/libs/whisper-lib.aar` - Pre-built Whisper.cpp native library
+
+**Model download:**
+Users can download models from the Settings screen under "Voice Recognition" section.
 
 ---
 

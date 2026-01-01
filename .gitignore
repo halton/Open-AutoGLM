@@ -89,10 +89,12 @@ android/app/debug/
 
 # Model files (large, downloaded at runtime)
 *.gguf
-*.bin
 *.safetensors
 
 # Environment files
 .env
 .env.local
 *.env
+
+# Build dependencies (cloned at build time)
+android/whisper-cpp/

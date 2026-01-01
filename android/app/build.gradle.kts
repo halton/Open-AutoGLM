@@ -166,6 +166,10 @@ dependencies {
     // Vosk offline speech recognition
     implementation("com.alphacephei:vosk-android:0.3.47")
 
+    // Whisper.cpp offline speech recognition (high-accuracy multilingual)
+    // Built from https://github.com/ggerganov/whisper.cpp/examples/whisper.android
+    implementation(files("libs/whisper-lib.aar"))
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
