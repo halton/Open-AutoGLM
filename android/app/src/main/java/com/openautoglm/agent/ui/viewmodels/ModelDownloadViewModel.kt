@@ -394,5 +394,6 @@ enum class ModelFilter {
     ALL,
     GGUF,      // AutoGLM-Phone models for llama.cpp
     MEDIAPIPE, // Gemma models for MediaPipe
+    WHISPER,   // Whisper speech recognition models
     DOWNLOADED
 }

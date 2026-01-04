@@ -13,8 +13,6 @@ import com.openautoglm.agent.voice.SpeechRecognizerType
 import com.openautoglm.agent.voice.VoskModelDownloadManager
 import com.openautoglm.agent.voice.VoskModelDownloadState
 import com.openautoglm.agent.voice.VoskModelInfo
-import com.openautoglm.agent.voice.WhisperModelDownloadManager
-import com.openautoglm.agent.voice.WhisperModelDownloadState
 import com.openautoglm.agent.voice.WhisperModelInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +31,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val cloudInference = CloudInference(application)
     private val downloadManager = ModelDownloadManager(application)
     private val voskModelManager = VoskModelDownloadManager(application)
-    private val whisperModelManager = WhisperModelDownloadManager(application)
 
     // UI State
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -41,9 +38,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     // Vosk download state
     val voskDownloadState: StateFlow<VoskModelDownloadState> = voskModelManager.downloadState
-
-    // Whisper download state
-    val whisperDownloadState: StateFlow<WhisperModelDownloadState> = whisperModelManager.downloadState
 
     init {
         loadCurrentSettings()
@@ -122,11 +116,28 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
      * Loads Whisper model information.
      */
     private fun loadWhisperModels() {
-        val availableWhisperModels = WhisperModelDownloadManager.AVAILABLE_MODELS
-        val downloadedWhisperModels = whisperModelManager.getDownloadedModels()
+        // Get downloaded Whisper models from the main ModelDownloadManager
+        // (Whisper models are downloaded via ModelDownloadScreen, not separately)
+        val downloadedWhisperModels = downloadManager.getWhisperModels()
+            .filter { downloadManager.isModelDownloaded(it.id) }
+            .map { modelInfo ->
+                // Convert ModelInfo to WhisperModelInfo for the UI
+                WhisperModelInfo(
+                    id = modelInfo.fileName, // Use filename as ID (e.g., "ggml-tiny.bin")
+                    name = modelInfo.displayName,
+                    url = modelInfo.downloadUrl,
+                    sizeMB = modelInfo.sizeMB.toInt(),
+                    description = modelInfo.description,
+                    accuracy = when {
+                        modelInfo.id.contains("tiny") -> "~70% WER"
+                        modelInfo.id.contains("base") -> "~60% WER"
+                        modelInfo.id.contains("small") -> "~45% WER"
+                        else -> ""
+                    }
+                )
+            }
 
         _uiState.value = _uiState.value.copy(
-            availableWhisperModels = availableWhisperModels,
             downloadedWhisperModels = downloadedWhisperModels
         )
     }
@@ -407,49 +418,23 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     // ========== Whisper Recognition Settings ==========
+    // Note: Whisper models are now downloaded through ModelDownloadScreen (ModelDownloadManager)
+    // instead of a separate WhisperModelDownloadManager. The functions below are kept for
+    // compatibility but delegate to the main download manager.
 
     /**
-     * Downloads a Whisper model.
+     * Refreshes the Whisper models list.
+     * Call this when returning from the model download screen.
      */
-    fun downloadWhisperModel(modelInfo: WhisperModelInfo) {
-        viewModelScope.launch {
-            val success = whisperModelManager.downloadModel(modelInfo)
-            if (success) {
-                loadWhisperModels()
-            }
-        }
-    }
-
-    /**
-     * Deletes a Whisper model.
-     */
-    fun deleteWhisperModel(modelInfo: WhisperModelInfo) {
-        viewModelScope.launch {
-            val success = whisperModelManager.deleteModel(modelInfo)
-            if (success) {
-                loadWhisperModels()
-                // If current type is Whisper and no models left, switch to Android
-                if (_uiState.value.speechRecognizerType == SpeechRecognizerType.WHISPER_OFFLINE &&
-                    whisperModelManager.getDownloadedModels().isEmpty()
-                ) {
-                    updateSpeechRecognizerType(SpeechRecognizerType.ANDROID_BUILTIN)
-                }
-            }
-        }
-    }
-
-    /**
-     * Resets Whisper download state to idle.
-     */
-    fun resetWhisperDownloadState() {
-        whisperModelManager.resetState()
+    fun refreshWhisperModels() {
+        loadWhisperModels()
     }
 
     /**
      * Checks if Whisper is available (any model downloaded).
      */
     fun isWhisperAvailable(): Boolean {
-        return whisperModelManager.getDownloadedModels().isNotEmpty()
+        return downloadManager.getWhisperModels().any { downloadManager.isModelDownloaded(it.id) }
     }
 }
 
@@ -479,7 +464,6 @@ data class SettingsUiState(
     val speechRecognizerType: SpeechRecognizerType = SpeechRecognizerType.ANDROID_BUILTIN,
     val availableVoskModels: List<VoskModelInfo> = emptyList(),
     val downloadedVoskModels: List<VoskModelInfo> = emptyList(),
-    // Whisper models
-    val availableWhisperModels: List<WhisperModelInfo> = emptyList(),
+    // Whisper models (downloaded via ModelDownloadScreen)
     val downloadedWhisperModels: List<WhisperModelInfo> = emptyList()
 )

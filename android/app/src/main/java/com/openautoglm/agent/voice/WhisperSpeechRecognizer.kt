@@ -66,16 +66,30 @@ class WhisperSpeechRecognizer(
         const val MODEL_SIZE_SMALL_MB = 466
 
         /**
-         * Get model directory for Whisper models.
+         * Get model directory for Whisper models (legacy location).
          */
         fun getModelDir(context: Context): File {
             return File(context.filesDir, "whisper-models")
         }
 
         /**
+         * Get unified models directory (used by ModelDownloadManager).
+         */
+        fun getUnifiedModelDir(context: Context): File {
+            return File(context.filesDir, "models")
+        }
+
+        /**
          * Get path to a specific model file.
+         * Checks unified models directory first, then falls back to legacy whisper-models.
          */
         fun getModelPath(context: Context, modelName: String): File {
+            // First check unified models directory
+            val unifiedPath = File(getUnifiedModelDir(context), modelName)
+            if (unifiedPath.exists() && unifiedPath.length() > 0) {
+                return unifiedPath
+            }
+            // Fall back to legacy whisper-models directory
             return File(getModelDir(context), modelName)
         }
 

@@ -793,7 +793,6 @@ private fun VoiceRecognitionSettings(
     uiState: com.openautoglm.agent.ui.viewmodels.SettingsUiState
 ) {
     val voskDownloadState by viewModel.voskDownloadState.collectAsState()
-    val whisperDownloadState by viewModel.whisperDownloadState.collectAsState()
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
@@ -892,42 +891,7 @@ private fun VoiceRecognitionSettings(
             }
         }
 
-        // Whisper Models Section
-        Text(
-            text = "Whisper Models (High Accuracy / 高精度)",
-            style = MaterialTheme.typography.titleSmall
-        )
-
-        Text(
-            text = "Based on OpenAI's Whisper. Processes audio after recording for higher accuracy.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                uiState.availableWhisperModels.forEach { model ->
-                    val isDownloaded = uiState.downloadedWhisperModels.any { it.id == model.id }
-
-                    WhisperModelItem(
-                        model = model,
-                        isDownloaded = isDownloaded,
-                        downloadState = whisperDownloadState,
-                        onDownload = { viewModel.downloadWhisperModel(model) },
-                        onDelete = { viewModel.deleteWhisperModel(model) }
-                    )
-
-                    if (model != uiState.availableWhisperModels.last()) {
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    }
-                }
-            }
-        }
+        // Note: Whisper models are now managed in the "Manage on-device models" screen
     }
 }
 
@@ -1006,93 +970,6 @@ private fun VoskModelItem(
         } else {
             val isDownloading = downloadState is VoskModelDownloadState.Downloading ||
                 downloadState is VoskModelDownloadState.Extracting
-
-            IconButton(
-                onClick = onDownload,
-                enabled = !isDownloading
-            ) {
-                if (isDownloading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Download,
-                        contentDescription = "Download model",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Individual Whisper model item with download/delete controls.
- */
-@Composable
-private fun WhisperModelItem(
-    model: WhisperModelInfo,
-    isDownloaded: Boolean,
-    downloadState: WhisperModelDownloadState,
-    onDownload: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "${model.name} - ${model.accuracy}",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = "${model.sizeMB} MB - ${model.description}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            // Show download progress
-            when (downloadState) {
-                is WhisperModelDownloadState.Downloading -> {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    LinearProgressIndicator(
-                        progress = { downloadState.progress },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Text(
-                        text = "%.1f / %.1f MB".format(downloadState.downloadedMB, downloadState.totalMB),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                is WhisperModelDownloadState.Error -> {
-                    Text(
-                        text = "Error: ${downloadState.message}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-                else -> {}
-            }
-        }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        if (isDownloaded) {
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete model",
-                    tint = MaterialTheme.colorScheme.error
-                )
-            }
-        } else {
-            val isDownloading = downloadState is WhisperModelDownloadState.Downloading
 
             IconButton(
                 onClick = onDownload,

@@ -2,6 +2,7 @@ package com.openautoglm.agent.voice
 
 import android.content.Context
 import android.util.Log
+import com.openautoglm.agent.inference.DownloadMirror
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,9 +19,14 @@ import java.net.URL
  */
 sealed class WhisperModelDownloadState {
     object Idle : WhisperModelDownloadState()
-    data class Downloading(val progress: Float, val downloadedMB: Float, val totalMB: Float) : WhisperModelDownloadState()
-    object Completed : WhisperModelDownloadState()
-    data class Error(val message: String) : WhisperModelDownloadState()
+    data class Downloading(
+        val modelId: String,
+        val progress: Float,
+        val downloadedMB: Float,
+        val totalMB: Float
+    ) : WhisperModelDownloadState()
+    data class Completed(val modelId: String) : WhisperModelDownloadState()
+    data class Error(val modelId: String, val message: String) : WhisperModelDownloadState()
 }
 
 /**
@@ -47,10 +53,21 @@ class WhisperModelDownloadManager(private val context: Context) {
     companion object {
         private const val TAG = "WhisperModelDownload"
         private const val BUFFER_SIZE = 8192
+        private const val MAX_RETRIES = 3
+        private const val RETRY_DELAY_MS = 2000L
+
+        /**
+         * GitHub fallback URLs for Whisper models (when HuggingFace is not accessible).
+         */
+        private val GITHUB_FALLBACK_URLS = mapOf(
+            "ggml-tiny.bin" to "https://github.com/ggerganov/whisper.cpp/releases/download/v1.5.4/ggml-tiny.bin",
+            "ggml-base.bin" to "https://github.com/ggerganov/whisper.cpp/releases/download/v1.5.4/ggml-base.bin",
+            "ggml-small.bin" to "https://github.com/ggerganov/whisper.cpp/releases/download/v1.5.4/ggml-small.bin"
+        )
 
         /**
          * Available models for download.
-         * Models are hosted on Hugging Face.
+         * Primary source is Hugging Face, with GitHub as fallback.
          */
         val AVAILABLE_MODELS = listOf(
             WhisperModelInfo(
@@ -90,10 +107,33 @@ class WhisperModelDownloadManager(private val context: Context) {
          * Get the default (tiny) model.
          */
         fun getDefaultModel(): WhisperModelInfo = AVAILABLE_MODELS[0]
+
+        /**
+         * Get the download URL for a model using the specified mirror.
+         */
+        fun getDownloadUrl(modelId: String, mirror: DownloadMirror): String {
+            val model = getModelById(modelId) ?: return ""
+            return model.url.replace("https://huggingface.co", mirror.baseUrl)
+        }
+
+        /**
+         * Get the GitHub fallback URL for a model.
+         */
+        fun getGitHubFallbackUrl(modelId: String): String? {
+            return GITHUB_FALLBACK_URLS[modelId]
+        }
     }
+
+    private val prefs = context.getSharedPreferences("whisper_download_prefs", Context.MODE_PRIVATE)
 
     private val _downloadState = MutableStateFlow<WhisperModelDownloadState>(WhisperModelDownloadState.Idle)
     val downloadState: StateFlow<WhisperModelDownloadState> = _downloadState.asStateFlow()
+
+    // Use same mirror as on-device models
+    private val _selectedMirror = MutableStateFlow(
+        DownloadMirror.fromOrdinal(prefs.getInt("selected_mirror", 0))
+    )
+    val selectedMirror: StateFlow<DownloadMirror> = _selectedMirror.asStateFlow()
 
     private val modelsDir = File(context.filesDir, "whisper-models")
 
@@ -140,41 +180,103 @@ class WhisperModelDownloadManager(private val context: Context) {
     }
 
     /**
-     * Download a model.
+     * Sets the download mirror to use.
+     */
+    fun setMirror(mirror: DownloadMirror) {
+        _selectedMirror.value = mirror
+        prefs.edit().putInt("selected_mirror", mirror.ordinal).apply()
+        Log.i(TAG, "Whisper mirror set to: ${mirror.displayName}")
+    }
+
+    /**
+     * Download a model with retry and mirror fallback.
+     * Uses the selected mirror first, then falls back to GitHub releases.
      */
     suspend fun downloadModel(modelInfo: WhisperModelInfo): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                _downloadState.value = WhisperModelDownloadState.Downloading(0f, 0f, modelInfo.sizeMB.toFloat())
+                _downloadState.value = WhisperModelDownloadState.Downloading(
+                    modelId = modelInfo.id,
+                    progress = 0f,
+                    downloadedMB = 0f,
+                    totalMB = modelInfo.sizeMB.toFloat()
+                )
 
                 val modelFile = File(modelsDir, modelInfo.id)
                 val tempFile = File(modelsDir, "${modelInfo.id}.tmp")
 
-                // Download the model file
-                Log.i(TAG, "Downloading model from: ${modelInfo.url}")
-                downloadFile(modelInfo.url, tempFile, modelInfo.sizeMB.toFloat())
+                // Build list of URLs to try: selected mirror first, then other mirrors, then GitHub fallback
+                val urlsToTry = mutableListOf<String>()
 
-                // Rename temp file to final name
-                if (tempFile.exists()) {
-                    if (modelFile.exists()) {
-                        modelFile.delete()
+                // Add URL with selected mirror
+                urlsToTry.add(getDownloadUrl(modelInfo.id, _selectedMirror.value))
+
+                // Add URLs with other mirrors
+                for (mirror in DownloadMirror.entries) {
+                    if (mirror != _selectedMirror.value) {
+                        urlsToTry.add(getDownloadUrl(modelInfo.id, mirror))
                     }
-                    tempFile.renameTo(modelFile)
                 }
 
-                // Verify download
-                if (isModelDownloaded(modelInfo)) {
-                    Log.i(TAG, "Model downloaded successfully: ${modelInfo.id}")
-                    _downloadState.value = WhisperModelDownloadState.Completed
-                    true
-                } else {
-                    Log.e(TAG, "Model download failed - file missing or too small")
-                    _downloadState.value = WhisperModelDownloadState.Error("Model download failed")
-                    false
+                // Add GitHub fallback
+                getGitHubFallbackUrl(modelInfo.id)?.let { urlsToTry.add(it) }
+
+                var lastError: Exception? = null
+
+                // Try each URL
+                for (mirrorUrl in urlsToTry) {
+                    Log.i(TAG, "Trying URL: $mirrorUrl")
+
+                    // Retry each URL a few times
+                    for (attempt in 1..MAX_RETRIES) {
+                        try {
+                            Log.i(TAG, "Download attempt $attempt/$MAX_RETRIES from: $mirrorUrl")
+                            downloadFile(mirrorUrl, tempFile, modelInfo.sizeMB.toFloat(), modelInfo.id)
+
+                            // Rename temp file to final name
+                            if (tempFile.exists() && tempFile.length() > 10 * 1024 * 1024) {
+                                if (modelFile.exists()) {
+                                    modelFile.delete()
+                                }
+                                tempFile.renameTo(modelFile)
+
+                                // Verify download
+                                if (isModelDownloaded(modelInfo)) {
+                                    Log.i(TAG, "Model downloaded successfully: ${modelInfo.id}")
+                                    _downloadState.value = WhisperModelDownloadState.Completed(modelInfo.id)
+                                    return@withContext true
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Attempt $attempt failed: ${e.message}")
+                            lastError = e
+
+                            // Clean up temp file
+                            if (tempFile.exists()) {
+                                tempFile.delete()
+                            }
+
+                            // Wait before retry
+                            if (attempt < MAX_RETRIES) {
+                                Thread.sleep(RETRY_DELAY_MS * attempt)
+                            }
+                        }
+                    }
+                    Log.w(TAG, "All retries failed for URL: $mirrorUrl")
                 }
+
+                Log.e(TAG, "All mirrors failed for model: ${modelInfo.id}", lastError)
+                _downloadState.value = WhisperModelDownloadState.Error(
+                    modelId = modelInfo.id,
+                    message = lastError?.message ?: "Download failed from all mirrors"
+                )
+                false
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to download model", e)
-                _downloadState.value = WhisperModelDownloadState.Error(e.message ?: "Unknown error")
+                _downloadState.value = WhisperModelDownloadState.Error(
+                    modelId = modelInfo.id,
+                    message = e.message ?: "Unknown error"
+                )
                 false
             }
         }
@@ -206,53 +308,72 @@ class WhisperModelDownloadManager(private val context: Context) {
         _downloadState.value = WhisperModelDownloadState.Idle
     }
 
-    private fun downloadFile(urlString: String, outputFile: File, totalSizeMB: Float) {
-        val url = URL(urlString)
-        val connection = url.openConnection() as HttpURLConnection
-        connection.connectTimeout = 30000
-        connection.readTimeout = 60000 // Longer timeout for large files
-        connection.instanceFollowRedirects = true
+    private fun downloadFile(urlString: String, outputFile: File, totalSizeMB: Float, modelId: String) {
+        var currentUrl = urlString
+        var redirectCount = 0
+        val maxRedirects = 10
 
-        try {
-            connection.connect()
+        while (redirectCount < maxRedirects) {
+            val url = URL(currentUrl)
 
-            val responseCode = connection.responseCode
-            if (responseCode != HttpURLConnection.HTTP_OK) {
-                throw Exception("Server returned HTTP $responseCode")
-            }
+            // Use hostname directly - let the system handle DNS resolution
+            // The previous IPv4-only approach broke HTTPS hostname verification
+            Log.d(TAG, "Connecting to: $currentUrl")
 
-            val totalBytes = connection.contentLength.toLong()
-            var downloadedBytes = 0L
+            val connection = url.openConnection() as HttpURLConnection
+            connection.connectTimeout = 60000  // Increased timeout
+            connection.readTimeout = 120000    // Increased for large files
+            connection.instanceFollowRedirects = true  // Let Java handle redirects
 
-            BufferedInputStream(connection.inputStream).use { input ->
-                FileOutputStream(outputFile).use { output ->
-                    val buffer = ByteArray(BUFFER_SIZE)
-                    var bytesRead: Int
+            connection.setRequestProperty("User-Agent", "Open-AutoGLM/1.0 (Android)")
+            connection.setRequestProperty("Accept", "*/*")
 
-                    while (input.read(buffer).also { bytesRead = it } != -1) {
-                        output.write(buffer, 0, bytesRead)
-                        downloadedBytes += bytesRead
+            try {
+                connection.connect()
 
-                        // Update progress
-                        val progress = if (totalBytes > 0) {
-                            downloadedBytes.toFloat() / totalBytes.toFloat()
-                        } else {
-                            downloadedBytes.toFloat() / (totalSizeMB * 1024 * 1024)
+                val responseCode = connection.responseCode
+
+                if (responseCode != HttpURLConnection.HTTP_OK) {
+                    throw Exception("Server returned HTTP $responseCode")
+                }
+
+                val totalBytes = connection.contentLength.toLong()
+                var downloadedBytes = 0L
+
+                BufferedInputStream(connection.inputStream).use { input ->
+                    FileOutputStream(outputFile).use { output ->
+                        val buffer = ByteArray(BUFFER_SIZE)
+                        var bytesRead: Int
+
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            output.write(buffer, 0, bytesRead)
+                            downloadedBytes += bytesRead
+
+                            // Update progress
+                            val progress = if (totalBytes > 0) {
+                                downloadedBytes.toFloat() / totalBytes.toFloat()
+                            } else {
+                                downloadedBytes.toFloat() / (totalSizeMB * 1024 * 1024)
+                            }
+                            val downloadedMB = downloadedBytes.toFloat() / (1024 * 1024)
+
+                            _downloadState.value = WhisperModelDownloadState.Downloading(
+                                modelId = modelId,
+                                progress = progress.coerceIn(0f, 1f),
+                                downloadedMB = downloadedMB,
+                                totalMB = totalSizeMB
+                            )
                         }
-                        val downloadedMB = downloadedBytes.toFloat() / (1024 * 1024)
-
-                        _downloadState.value = WhisperModelDownloadState.Downloading(
-                            progress = progress.coerceIn(0f, 1f),
-                            downloadedMB = downloadedMB,
-                            totalMB = totalSizeMB
-                        )
                     }
                 }
-            }
 
-            Log.i(TAG, "Download complete: ${outputFile.absolutePath} (${downloadedBytes / 1024 / 1024} MB)")
-        } finally {
-            connection.disconnect()
+                Log.i(TAG, "Download complete: ${outputFile.absolutePath} (${downloadedBytes / 1024 / 1024} MB)")
+                return
+            } finally {
+                connection.disconnect()
+            }
         }
+
+        throw Exception("Too many redirects")
     }
 }
