@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -13,6 +14,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.openautoglm.agent.agent.TaskRedoHandler
 import com.openautoglm.agent.data.entities.Task
 import com.openautoglm.agent.data.entities.TaskStatus
 import com.openautoglm.agent.ui.viewmodels.HistoryViewModel
@@ -23,14 +25,27 @@ import java.util.*
  * Screen for viewing task history.
  *
  * Displays all completed, failed, and cancelled tasks from the database.
+ * Supports redoing tasks to re-execute them with the same parameters.
+ *
+ * @param viewModel The HistoryViewModel instance
+ * @param onRedoTask Callback invoked when user wants to redo a task.
+ *                   Receives the task description to be executed.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
-    viewModel: HistoryViewModel = viewModel()
+    viewModel: HistoryViewModel = viewModel(),
+    onRedoTask: ((TaskRedoHandler.RedoTaskInfo) -> Unit)? = null
 ) {
     val tasks by viewModel.tasks.collectAsState()
     var showClearDialog by remember { mutableStateOf(false) }
+
+    // Observe redo events and forward to callback
+    LaunchedEffect(Unit) {
+        viewModel.redoTaskEvent.collect { redoInfo ->
+            onRedoTask?.invoke(redoInfo)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -92,6 +107,8 @@ fun HistoryScreen(
                 items(tasks, key = { it.id }) { task ->
                     TaskHistoryItem(
                         task = task,
+                        canRedo = viewModel.canRedoTask(task),
+                        onRedo = { viewModel.redoTask(task) },
                         onDelete = { viewModel.deleteTask(task) }
                     )
                 }
@@ -127,6 +144,8 @@ fun HistoryScreen(
 @Composable
 fun TaskHistoryItem(
     task: Task,
+    canRedo: Boolean = true,
+    onRedo: () -> Unit = {},
     onDelete: () -> Unit
 ) {
     val dateFormatter = remember { SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()) }
@@ -225,6 +244,17 @@ fun TaskHistoryItem(
                         color = MaterialTheme.colorScheme.error,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            // Redo button
+            if (canRedo) {
+                IconButton(onClick = onRedo) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Redo",
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }

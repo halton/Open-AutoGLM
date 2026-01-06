@@ -10,15 +10,26 @@ import com.openautoglm.agent.accessibility.ScreenCaptureManager
 import com.openautoglm.agent.data.AgentRepository
 import com.openautoglm.agent.data.AppDatabase
 import com.openautoglm.agent.inference.CloudInference
+import com.openautoglm.agent.inference.InferenceRouterImpl
+import com.openautoglm.agent.voice.AudioPermissionState
+import com.openautoglm.agent.voice.PermissionHandler
+import com.openautoglm.agent.voice.VoiceInputConfig
+import com.openautoglm.agent.voice.VoiceInputManager
+import com.openautoglm.agent.voice.VoiceInputManagerImpl
+import com.openautoglm.agent.voice.VoiceInputState
+import com.openautoglm.agent.service.PauseResumeController
+import com.openautoglm.agent.service.PauseResumeEvent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 /**
  * ViewModel for the Task screen.
  *
  * Manages the PhoneAgent lifecycle and exposes agent state to the UI.
+ * Also manages voice input for task creation.
  */
 class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -30,7 +41,9 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         userPreferencesDao = database.userPreferencesDao(),
         modelConfigDao = database.modelConfigDao()
     )
-    private val modelClient = CloudInference(application)
+    // Use InferenceRouterImpl for smart routing between on-device and cloud
+    // with automatic fallback when network is unavailable
+    private val modelClient = InferenceRouterImpl(application, repository)
     private val screenCapture = ScreenCaptureManager.getInstance(application)
     private val config = AgentConfig.DEFAULT
 
@@ -43,6 +56,101 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     val agentState: StateFlow<AgentState> = agent.agentState
+
+    init {
+        // Listen for pause/resume events from the floating overlay
+        viewModelScope.launch {
+            PauseResumeController.pauseResumeEvents.collect { event ->
+                android.util.Log.i("TaskViewModel", "Received pause/resume event: $event")
+                handlePauseResumeEvent(event)
+            }
+        }
+    }
+
+    private fun handlePauseResumeEvent(event: PauseResumeEvent) {
+        when (event) {
+            is PauseResumeEvent.Toggle -> {
+                val currentState = agentState.value
+                if (currentState is AgentState.Running) {
+                    pauseTask()
+                } else if (currentState is AgentState.Paused) {
+                    resumeTask()
+                }
+            }
+            is PauseResumeEvent.Pause -> pauseTask()
+            is PauseResumeEvent.Resume -> resumeTask()
+        }
+    }
+
+    // Voice input support
+    private val voiceInputManager: VoiceInputManager = VoiceInputManagerImpl(
+        context = application,
+        config = VoiceInputConfig.fromAgentLanguage(config.language),
+        language = config.language
+    )
+
+    /**
+     * Current state of voice input.
+     */
+    val voiceInputState: StateFlow<VoiceInputState> = voiceInputManager.state
+
+    /**
+     * Whether speech recognition is available on this device.
+     */
+    val isVoiceInputAvailable: Boolean
+        get() = voiceInputManager.isAvailable
+
+    private val _audioPermissionState = MutableStateFlow(
+        PermissionHandler.checkAudioPermissionState(application)
+    )
+
+    /**
+     * Current state of audio permission.
+     */
+    val audioPermissionState: StateFlow<AudioPermissionState> = _audioPermissionState.asStateFlow()
+
+    /**
+     * Updates the audio permission state (call after permission request result).
+     */
+    fun updateAudioPermissionState(state: AudioPermissionState) {
+        _audioPermissionState.value = state
+    }
+
+    /**
+     * Refresh the audio permission state from system.
+     */
+    fun refreshAudioPermissionState() {
+        _audioPermissionState.value = PermissionHandler.checkAudioPermissionState(getApplication())
+    }
+
+    /**
+     * Start voice input recognition.
+     */
+    fun startVoiceInput() {
+        val locale = VoiceInputManagerImpl.getLocaleFromLanguage(config.language)
+        voiceInputManager.startListening(locale)
+    }
+
+    /**
+     * Stop voice input and process final result.
+     */
+    fun stopVoiceInput() {
+        voiceInputManager.stopListening()
+    }
+
+    /**
+     * Cancel voice input without processing.
+     */
+    fun cancelVoiceInput() {
+        voiceInputManager.cancelListening()
+    }
+
+    /**
+     * Reset voice input to idle state.
+     */
+    fun resetVoiceInput() {
+        voiceInputManager.cancelListening()
+    }
 
     /**
      * Starts a new task.
@@ -87,9 +195,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
      * Resumes a paused task.
      */
     fun resumeTask() {
-        viewModelScope.launch {
-            agent.step()
-        }
+        agent.resume()
     }
 
     /**
@@ -106,5 +212,10 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun reset() {
         agent.reset()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        voiceInputManager.destroy()
     }
 }

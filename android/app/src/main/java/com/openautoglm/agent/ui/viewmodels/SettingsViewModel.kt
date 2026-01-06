@@ -3,8 +3,11 @@ package com.openautoglm.agent.ui.viewmodels
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.openautoglm.agent.data.entities.InferenceMode
 import com.openautoglm.agent.inference.CloudInference
 import com.openautoglm.agent.inference.InferenceProvider
+import com.openautoglm.agent.inference.ModelDownloadManager
+import com.openautoglm.agent.inference.ModelInfo
 import com.openautoglm.agent.inference.SecureKeyStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +23,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val secureStorage = SecureKeyStorage(application)
     private val cloudInference = CloudInference(application)
+    private val downloadManager = ModelDownloadManager(application)
 
     // UI State
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -27,6 +31,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     init {
         loadCurrentSettings()
+        loadDownloadedModels()
     }
 
     /**
@@ -34,6 +39,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
      */
     private fun loadCurrentSettings() {
         val selectedProvider = secureStorage.getSelectedProvider()
+        val inferenceMode = secureStorage.getInferenceMode()
+
+        // Configuration is complete if:
+        // 1. ON_DEVICE mode with downloaded models, OR
+        // 2. CLOUD/AUTO mode with API key configured
+        val hasDownloadedModels = downloadManager.getDownloadedModels().isNotEmpty()
+        val hasCloudApiKey = secureStorage.hasSelectedProviderApiKey()
+        val isConfigured = when (inferenceMode) {
+            InferenceMode.ON_DEVICE -> hasDownloadedModels
+            InferenceMode.CLOUD -> hasCloudApiKey
+            InferenceMode.AUTO -> hasCloudApiKey || hasDownloadedModels
+        }
 
         _uiState.value = SettingsUiState(
             selectedProvider = selectedProvider,
@@ -44,7 +61,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             openAiApiKey = secureStorage.getOpenAIApiKey() ?: "",
             customApiKey = secureStorage.getCustomApiKey() ?: "",
             customBaseUrl = secureStorage.getCustomApiBaseUrl() ?: "",
-            isConfigured = secureStorage.hasSelectedProviderApiKey()
+            isConfigured = isConfigured,
+            inferenceMode = inferenceMode,
+            selectedOnDeviceModel = secureStorage.getSelectedOnDeviceModel(),
+            huggingFaceToken = secureStorage.getHuggingFaceToken() ?: ""
+        )
+    }
+
+    /**
+     * Loads downloaded models for selection.
+     */
+    private fun loadDownloadedModels() {
+        val downloadedModels = downloadManager.getDownloadedModels()
+        _uiState.value = _uiState.value.copy(
+            downloadedModels = downloadedModels
         )
     }
 
@@ -105,6 +135,45 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
+     * Updates the inference mode (Cloud, On-Device, or Auto).
+     */
+    fun updateInferenceMode(mode: InferenceMode) {
+        val state = _uiState.value
+        val hasDownloadedModels = state.downloadedModels.isNotEmpty()
+        val hasCloudApiKey = secureStorage.hasSelectedProviderApiKey()
+
+        // Recalculate isConfigured based on new mode
+        val isConfigured = when (mode) {
+            InferenceMode.ON_DEVICE -> hasDownloadedModels
+            InferenceMode.CLOUD -> hasCloudApiKey
+            InferenceMode.AUTO -> hasCloudApiKey || hasDownloadedModels
+        }
+
+        _uiState.value = state.copy(inferenceMode = mode, isConfigured = isConfigured)
+    }
+
+    /**
+     * Updates the selected on-device model.
+     */
+    fun updateSelectedOnDeviceModel(modelId: String?) {
+        _uiState.value = _uiState.value.copy(selectedOnDeviceModel = modelId)
+    }
+
+    /**
+     * Updates the HuggingFace token.
+     */
+    fun updateHuggingFaceToken(token: String) {
+        _uiState.value = _uiState.value.copy(huggingFaceToken = token)
+    }
+
+    /**
+     * Refreshes the downloaded models list.
+     */
+    fun refreshDownloadedModels() {
+        loadDownloadedModels()
+    }
+
+    /**
      * Saves the current settings to secure storage.
      */
     fun saveSettings() {
@@ -118,19 +187,35 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             try {
                 val state = _uiState.value
 
+                // Save inference mode and on-device model selection
+                secureStorage.setInferenceMode(state.inferenceMode)
+                state.selectedOnDeviceModel?.let {
+                    secureStorage.setSelectedOnDeviceModel(it)
+                }
+
+                // Save HuggingFace token if provided
+                if (state.huggingFaceToken.isNotBlank()) {
+                    secureStorage.setHuggingFaceToken(state.huggingFaceToken)
+                } else {
+                    secureStorage.clearHuggingFaceToken()
+                }
+
                 // Save selected provider
                 secureStorage.setSelectedProvider(state.selectedProvider)
 
                 // Save API keys and models
+                // Skip API key validation if inference mode is ON_DEVICE (doesn't need cloud)
+                val requireCloudApi = state.inferenceMode != InferenceMode.ON_DEVICE
+
                 when (state.selectedProvider) {
                     InferenceProvider.BIGMODEL -> {
                         if (state.bigModelApiKey.isNotBlank()) {
                             secureStorage.setBigModelApiKey(state.bigModelApiKey)
                             secureStorage.setBigModelModelId(state.bigModelModelId)
-                        } else {
+                        } else if (requireCloudApi) {
                             _uiState.value = _uiState.value.copy(
                                 isSaving = false,
-                                saveError = "BigModel API key is required"
+                                saveError = "BigModel API key is required for Cloud/Auto mode"
                             )
                             return@launch
                         }
@@ -139,10 +224,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         if (state.dashScopeApiKey.isNotBlank()) {
                             secureStorage.setDashScopeApiKey(state.dashScopeApiKey)
                             secureStorage.setDashScopeModelId(state.dashScopeModelId)
-                        } else {
+                        } else if (requireCloudApi) {
                             _uiState.value = _uiState.value.copy(
                                 isSaving = false,
-                                saveError = "DashScope API key is required"
+                                saveError = "DashScope API key is required for Cloud/Auto mode"
                             )
                             return@launch
                         }
@@ -150,10 +235,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     InferenceProvider.OPENAI -> {
                         if (state.openAiApiKey.isNotBlank()) {
                             secureStorage.setOpenAIApiKey(state.openAiApiKey)
-                        } else {
+                        } else if (requireCloudApi) {
                             _uiState.value = _uiState.value.copy(
                                 isSaving = false,
-                                saveError = "OpenAI API key is required"
+                                saveError = "OpenAI API key is required for Cloud/Auto mode"
                             )
                             return@launch
                         }
@@ -161,20 +246,29 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     InferenceProvider.CUSTOM -> {
                         if (state.customApiKey.isNotBlank() && state.customBaseUrl.isNotBlank()) {
                             secureStorage.setCustomApiConfig(state.customApiKey, state.customBaseUrl)
-                        } else {
+                        } else if (requireCloudApi) {
                             _uiState.value = _uiState.value.copy(
                                 isSaving = false,
-                                saveError = "Custom API key and base URL are required"
+                                saveError = "Custom API key and base URL are required for Cloud/Auto mode"
                             )
                             return@launch
                         }
                     }
                 }
 
+                // Recalculate isConfigured based on mode
+                val hasDownloadedModels = downloadManager.getDownloadedModels().isNotEmpty()
+                val hasCloudApiKey = secureStorage.hasSelectedProviderApiKey()
+                val isConfigured = when (state.inferenceMode) {
+                    InferenceMode.ON_DEVICE -> hasDownloadedModels
+                    InferenceMode.CLOUD -> hasCloudApiKey
+                    InferenceMode.AUTO -> hasCloudApiKey || hasDownloadedModels
+                }
+
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
                     saveSuccess = true,
-                    isConfigured = true
+                    isConfigured = isConfigured
                 )
 
                 // Clear success message after 3 seconds
@@ -221,5 +315,11 @@ data class SettingsUiState(
     val isConfigured: Boolean = false,
     val isSaving: Boolean = false,
     val saveSuccess: Boolean = false,
-    val saveError: String? = null
+    val saveError: String? = null,
+    // Inference mode settings
+    val inferenceMode: InferenceMode = InferenceMode.CLOUD,
+    val selectedOnDeviceModel: String? = null,
+    val downloadedModels: List<ModelInfo> = emptyList(),
+    // HuggingFace token for gated model downloads
+    val huggingFaceToken: String = ""
 )

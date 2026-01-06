@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AutoGLM</string>
+    <string name="accessibility_service_description">AutoGLM 使用无障碍服务来跨应用自动执行任务。这包括读取屏幕内容、执行点击、滑动和文字输入。</string>
+
+    <!-- Common UI strings -->
+    <string name="start_task">开始任务</string>
+    <string name="cancel">取消</string>
+    <string name="confirm">确认</string>
+    <string name="settings">设置</string>
+    <string name="history">历史</string>
+    <string name="loading">加载中…</string>
+
+    <!-- Navigation tabs -->
+    <string name="tab_tasks">任务</string>
+    <string name="tab_history">历史</string>
+    <string name="tab_settings">设置</string>
+
+    <!-- Task status -->
+    <string name="status_pending">等待中</string>
+    <string name="status_running">运行中</string>
+    <string name="status_paused">已暂停</string>
+    <string name="status_completed">已完成</string>
+    <string name="status_failed">失败</string>
+    <string name="status_cancelled">已取消</string>
+
+    <!-- Error messages -->
+    <string name="error_accessibility_not_enabled">请启用无障碍服务以使用 AutoGLM</string>
+    <string name="error_network_unavailable">网络不可用，切换到本地模式。</string>
+    <string name="error_cloud_inference_failed">云端推理失败，正在使用本地模型重试。</string>
+
+    <!-- Model download errors -->
+    <string name="error_download_network_connection">网络连接错误。请确保可以访问 huggingface.co（部分地区可能需要 VPN）。</string>
+    <string name="error_download_timeout">连接超时。huggingface.co 可能在您的地区被屏蔽，请尝试使用 VPN。</string>
+    <string name="error_download_failed">下载失败：%1$s</string>
+
+    <!-- Voice input -->
+    <string name="voice_start_listening">点击说话</string>
+    <string name="voice_stop_listening">点击停止</string>
+    <string name="voice_listening">正在听…</string>
+    <string name="voice_processing">处理中…</string>
+    <string name="voice_permission_denied">麦克风权限被拒绝</string>
+    <string name="voice_permission_required">需要麦克风权限</string>
+    <string name="voice_permission_rationale">语音输入需要访问麦克风来将您的语音转换为文字。您的语音不会被存储。</string>
+    <string name="voice_permission_settings">麦克风权限已被拒绝。请在设置中开启权限以使用语音输入。</string>
+    <string name="voice_open_settings">打开设置</string>
+    <string name="voice_not_available">此设备不支持语音识别</string>
+    <string name="voice_error_retry">重试</string>
+    <string name="voice_use_text">使用转录文本</string>
+</resources>

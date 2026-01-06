@@ -34,4 +34,18 @@
     <string name="error_download_network_connection_zh">网络连接错误。请确保可以访问 huggingface.co（部分地区可能需要 VPN）。</string>
     <string name="error_download_timeout">Connection timed out. huggingface.co may be blocked in your region. Try using a VPN.</string>
     <string name="error_download_failed">Download failed: %1$s</string>
+
+    <!-- Voice input -->
+    <string name="voice_start_listening">Tap to speak</string>
+    <string name="voice_stop_listening">Tap to stop</string>
+    <string name="voice_listening">Listening…</string>
+    <string name="voice_processing">Processing…</string>
+    <string name="voice_permission_denied">Microphone permission denied</string>
+    <string name="voice_permission_required">Microphone Permission Required</string>
+    <string name="voice_permission_rationale">Voice input needs microphone access to convert your speech to text. Your voice is not stored.</string>
+    <string name="voice_permission_settings">Microphone permission was denied. Please enable it in Settings to use voice input.</string>
+    <string name="voice_open_settings">Open Settings</string>
+    <string name="voice_not_available">Speech recognition not available on this device</string>
+    <string name="voice_error_retry">Retry</string>
+    <string name="voice_use_text">Use transcription</string>
 </resources>

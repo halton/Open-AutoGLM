@@ -16,6 +16,7 @@ import com.openautoglm.agent.knowledge.PromptTemplates
 import com.openautoglm.agent.model.ChatMessage
 import com.openautoglm.agent.model.ContentPart
 import com.openautoglm.agent.model.ModelClient
+import com.openautoglm.agent.service.FloatingOverlayService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,6 +71,8 @@ class PhoneAgent(
     private val conversationContext = mutableListOf<ChatMessage>()
     private var stepCount = 0
     private var currentTaskId: UUID? = null
+    @Volatile
+    private var isPaused = false
 
     // State flow for UI observation
     private val _agentState = MutableStateFlow<AgentState>(AgentState.Idle)
@@ -101,6 +104,10 @@ class PhoneAgent(
         stepCount = 0
         _agentState.value = AgentState.Running(task.id, stepCount, taskDescription)
 
+        // Start the floating overlay
+        FloatingOverlayService.start(context)
+        updateOverlay(AgentState.Running(task.id, stepCount, taskDescription), taskDescription)
+
         // Execute first step with user prompt
         var result = executeStep(taskDescription, isFirst = true)
 
@@ -111,6 +118,12 @@ class PhoneAgent(
 
         // Continue until finished or max steps reached
         while (stepCount < config.maxStepsPerTask) {
+            // Check if paused and wait
+            while (isPaused) {
+                Log.d(TAG, "Agent is paused, waiting...")
+                kotlinx.coroutines.delay(500)
+            }
+
             result = executeStep(isFirst = false)
 
             if (result.finished) {
@@ -164,18 +177,36 @@ class PhoneAgent(
         conversationContext.clear()
         stepCount = 0
         currentTaskId = null
+        isPaused = false
         _agentState.value = AgentState.Idle
+        updateOverlay(AgentState.Idle)
+        FloatingOverlayService.stop(context)
     }
 
     /**
      * Pauses the current task execution.
      */
     suspend fun pause() {
+        Log.i(TAG, "Pausing agent execution")
+        isPaused = true
         currentTaskId?.let { taskId ->
             repository.getTaskById(taskId)?.let { task ->
                 repository.updateTask(task.copy(status = TaskStatus.PAUSED))
                 _agentState.value = AgentState.Paused(taskId)
+                updateOverlay(AgentState.Paused(taskId), task.description)
             }
+        }
+    }
+
+    /**
+     * Resumes a paused task execution.
+     */
+    fun resume() {
+        Log.i(TAG, "Resuming agent execution")
+        isPaused = false
+        currentTaskId?.let { taskId ->
+            _agentState.value = AgentState.Running(taskId, stepCount, "Resuming...")
+            updateOverlay(_agentState.value)
         }
     }
 
@@ -201,6 +232,19 @@ class PhoneAgent(
     fun getStepCount(): Int = stepCount
 
     /**
+     * Updates the floating overlay with current agent state.
+     */
+    private fun updateOverlay(state: AgentState, description: String? = null) {
+        FloatingOverlayService.updateState(
+            context = context,
+            state = state,
+            step = stepCount,
+            maxSteps = config.maxStepsPerTask,
+            description = description
+        )
+    }
+
+    /**
      * Internal method to execute a single step of the agent loop.
      */
     private suspend fun executeStep(
@@ -217,6 +261,7 @@ class PhoneAgent(
                 stepCount,
                 userPrompt ?: "Continuing task..."
             )
+            updateOverlay(_agentState.value, userPrompt)
 
             // On first step, go to home screen first so the model doesn't see the app's own UI
             if (isFirst) {
@@ -354,6 +399,9 @@ class PhoneAgent(
 
         } catch (e: Exception) {
             Log.e(TAG, "Step execution error", e)
+            val errorState = AgentState.Error(e.message ?: "Unknown error")
+            _agentState.value = errorState
+            updateOverlay(errorState)
             return StepResult(
                 success = false,
                 finished = true,
@@ -390,7 +438,13 @@ class PhoneAgent(
                 )
             )
         }
-        _agentState.value = AgentState.Finished(taskId, message)
+        val finishedState = AgentState.Finished(taskId, message)
+        _agentState.value = finishedState
+        updateOverlay(finishedState)
+
+        // Stop the overlay service after a delay to show the finished state
+        kotlinx.coroutines.delay(2000)
+        FloatingOverlayService.stop(context)
     }
 }
 

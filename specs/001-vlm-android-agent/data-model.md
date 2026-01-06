@@ -374,3 +374,184 @@ CREATE INDEX idx_actions_task_id ON actions(task_id);
 CREATE INDEX idx_tasks_status ON tasks(status);
 CREATE INDEX idx_tasks_created_at ON tasks(created_at DESC);
 ```
+
+---
+
+## Voice Input Extension (Added 2025-12-20)
+
+The following entities support voice input for task creation.
+
+### VoiceInputState (Sealed Class)
+
+Represents the current state of the voice input system.
+
+```kotlin
+package com.openautoglm.agent.voice
+
+/**
+ * Sealed class representing the possible states of voice input.
+ * Used by UI to render appropriate feedback and controls.
+ */
+sealed class VoiceInputState {
+
+    /** Initial state - voice input not active. */
+    object Idle : VoiceInputState()
+
+    /**
+     * Recognizer is ready and listening for speech.
+     * @param partialText Current partial transcription (may be empty)
+     * @param soundLevel Audio input level (0.0 to 1.0) for visualization
+     */
+    data class Listening(
+        val partialText: String = "",
+        val soundLevel: Float = 0f
+    ) : VoiceInputState()
+
+    /** Speech detected, processing recognition. */
+    object Processing : VoiceInputState()
+
+    /**
+     * Recognition completed successfully.
+     * @param transcription Final transcribed text
+     * @param confidence Recognition confidence (0.0 to 1.0), if available
+     */
+    data class Result(
+        val transcription: String,
+        val confidence: Float? = null
+    ) : VoiceInputState()
+
+    /**
+     * Recognition failed with error.
+     * @param message User-facing error message (localized)
+     * @param errorCode Android SpeechRecognizer error code
+     * @param isRetryable Whether user can retry recognition
+     */
+    data class Error(
+        val message: String,
+        val errorCode: Int,
+        val isRetryable: Boolean = true
+    ) : VoiceInputState()
+}
+```
+
+### VoiceInputConfig (Data Class)
+
+Configuration options for voice recognition behavior.
+
+```kotlin
+package com.openautoglm.agent.voice
+
+import java.util.Locale
+
+/**
+ * Configuration for voice input behavior.
+ */
+data class VoiceInputConfig(
+    /** Whether voice input is enabled in the app. */
+    val enabled: Boolean = true,
+
+    /** Locale for speech recognition. Default: derived from AgentConfig.language */
+    val locale: Locale = Locale.getDefault(),
+
+    /** Whether to show partial results during recognition. */
+    val showPartialResults: Boolean = true,
+
+    /** Maximum duration for a single recognition session (ms). Default: 60s */
+    val maxDurationMs: Long = 60_000,
+
+    /** Silence duration before recognition stops (ms). Default: 1.5s */
+    val silenceTimeoutMs: Long = 1500,
+
+    /** Prefer offline recognition if available. */
+    val preferOffline: Boolean = false
+) {
+    companion object {
+        fun chinese() = VoiceInputConfig(locale = Locale.CHINESE, silenceTimeoutMs = 2000)
+        fun english() = VoiceInputConfig(locale = Locale.US)
+
+        fun fromAgentLanguage(language: String): VoiceInputConfig = when (language) {
+            "zh" -> chinese()
+            "en" -> english()
+            else -> VoiceInputConfig()
+        }
+    }
+}
+```
+
+### AudioPermissionState (Enum)
+
+Tracks the state of RECORD_AUDIO permission.
+
+```kotlin
+package com.openautoglm.agent.voice
+
+enum class AudioPermissionState {
+    GRANTED,           // Voice input fully available
+    NOT_REQUESTED,     // Will be requested when user taps mic
+    DENIED_SHOW_RATIONALE, // Should show rationale before requesting again
+    PERMANENTLY_DENIED,    // Must direct user to app settings
+    UNKNOWN
+}
+```
+
+### VoiceErrorCode (Enum)
+
+Wrapper for Android SpeechRecognizer error codes with localized messages.
+
+```kotlin
+package com.openautoglm.agent.voice
+
+import android.speech.SpeechRecognizer
+
+enum class VoiceErrorCode(
+    val androidCode: Int,
+    val isRetryable: Boolean,
+    val messageEn: String,
+    val messageZh: String
+) {
+    NETWORK_TIMEOUT(SpeechRecognizer.ERROR_NETWORK_TIMEOUT, true,
+        "Network timeout. Please try again.", "网络超时，请重试。"),
+    NETWORK_ERROR(SpeechRecognizer.ERROR_NETWORK, true,
+        "Network error. Check your connection.", "网络错误，请检查网络连接。"),
+    AUDIO_ERROR(SpeechRecognizer.ERROR_AUDIO, false,
+        "Microphone error. Please check your device.", "麦克风错误，请检查设备。"),
+    SPEECH_TIMEOUT(SpeechRecognizer.ERROR_SPEECH_TIMEOUT, true,
+        "No speech detected. Please speak into the microphone.", "未检测到语音，请对着麦克风说话。"),
+    NO_MATCH(SpeechRecognizer.ERROR_NO_MATCH, true,
+        "Could not recognize speech. Please try again.", "无法识别语音，请重试。"),
+    INSUFFICIENT_PERMISSIONS(SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS, false,
+        "Microphone permission required.", "需要麦克风权限。"),
+    UNKNOWN(-1, true,
+        "Unknown error. Please try again.", "未知错误，请重试。");
+
+    companion object {
+        fun fromAndroidCode(code: Int): VoiceErrorCode =
+            values().find { it.androidCode == code } ?: UNKNOWN
+    }
+
+    fun getMessage(language: String): String = if (language == "zh") messageZh else messageEn
+}
+```
+
+### Voice Input State Transitions
+
+| From | To | Trigger |
+|------|-----|---------|
+| Idle | Listening | User taps mic button |
+| Listening | Listening | Partial results received |
+| Listening | Processing | Speech ends |
+| Listening | Error | Recognition error |
+| Listening | Idle | User cancels |
+| Processing | Result | Recognition complete |
+| Processing | Error | Recognition failed |
+| Result | Idle | User confirms or dismisses |
+| Error | Idle | User dismisses |
+| Error | Listening | User retries |
+
+### Integration with Task Entity
+
+No changes to the Task entity are required. Voice transcription flows into the existing `description: String` field just like text input:
+
+```
+Voice Input → VoiceInputState.Result.transcription → Task.description
+```

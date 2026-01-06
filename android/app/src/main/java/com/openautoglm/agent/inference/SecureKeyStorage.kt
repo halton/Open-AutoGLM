@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.openautoglm.agent.data.entities.InferenceMode
 import java.security.KeyStore
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -48,6 +49,11 @@ class SecureKeyStorage(context: Context) {
         private const val KEY_SELECTED_PROVIDER = "selected_provider"
         private const val KEY_BIGMODEL_MODEL_ID = "bigmodel_model_id"
         private const val KEY_DASHSCOPE_MODEL_ID = "dashscope_model_id"
+
+        // Inference mode and on-device model selection
+        private const val KEY_INFERENCE_MODE = "inference_mode"
+        private const val KEY_SELECTED_ON_DEVICE_MODEL = "selected_on_device_model"
+        private const val KEY_HUGGINGFACE_TOKEN = "huggingface_token"
 
         // Default model IDs
         const val DEFAULT_BIGMODEL_MODEL = "AutoGLM-Phone"
@@ -273,6 +279,93 @@ class SecureKeyStorage(context: Context) {
             "OpenAI" to !getOpenAIApiKey().isNullOrBlank(),
             "Custom" to !getCustomApiKey().isNullOrBlank()
         )
+    }
+
+    // ========== Inference Mode Settings ==========
+
+    /**
+     * Sets the inference mode (Cloud, On-Device, or Auto).
+     *
+     * @param mode The inference mode to use
+     */
+    fun setInferenceMode(mode: InferenceMode) {
+        sharedPreferences.edit()
+            .putString(KEY_INFERENCE_MODE, mode.name)
+            .apply()
+    }
+
+    /**
+     * Gets the selected inference mode.
+     *
+     * @return The selected mode, or CLOUD as default
+     */
+    fun getInferenceMode(): InferenceMode {
+        val modeName = sharedPreferences.getString(KEY_INFERENCE_MODE, InferenceMode.CLOUD.name)
+        return try {
+            InferenceMode.valueOf(modeName ?: InferenceMode.CLOUD.name)
+        } catch (e: IllegalArgumentException) {
+            InferenceMode.CLOUD
+        }
+    }
+
+    /**
+     * Sets the selected on-device model ID.
+     *
+     * @param modelId The model ID to use for on-device inference
+     */
+    fun setSelectedOnDeviceModel(modelId: String) {
+        sharedPreferences.edit()
+            .putString(KEY_SELECTED_ON_DEVICE_MODEL, modelId)
+            .apply()
+    }
+
+    /**
+     * Gets the selected on-device model ID.
+     *
+     * @return The model ID, or null if not set (will use first available)
+     */
+    fun getSelectedOnDeviceModel(): String? {
+        return sharedPreferences.getString(KEY_SELECTED_ON_DEVICE_MODEL, null)
+    }
+
+    // ========== HuggingFace Token (for gated models like Gemma) ==========
+
+    /**
+     * Sets the HuggingFace access token for downloading gated models.
+     *
+     * @param token The HuggingFace access token
+     */
+    fun setHuggingFaceToken(token: String) {
+        sharedPreferences.edit()
+            .putString(KEY_HUGGINGFACE_TOKEN, token)
+            .apply()
+    }
+
+    /**
+     * Gets the HuggingFace access token.
+     *
+     * @return The token, or null if not set
+     */
+    fun getHuggingFaceToken(): String? {
+        return sharedPreferences.getString(KEY_HUGGINGFACE_TOKEN, null)
+    }
+
+    /**
+     * Checks if a HuggingFace token is configured.
+     *
+     * @return true if a token is set
+     */
+    fun hasHuggingFaceToken(): Boolean {
+        return !getHuggingFaceToken().isNullOrBlank()
+    }
+
+    /**
+     * Clears the HuggingFace token.
+     */
+    fun clearHuggingFaceToken() {
+        sharedPreferences.edit()
+            .remove(KEY_HUGGINGFACE_TOKEN)
+            .apply()
     }
 }
 

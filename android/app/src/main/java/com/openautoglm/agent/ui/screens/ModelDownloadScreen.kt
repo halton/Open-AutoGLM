@@ -1,5 +1,7 @@
 package com.openautoglm.agent.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -10,12 +12,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -95,10 +99,45 @@ fun ModelDownloadScreen(
             ModelFilter.DOWNLOADED -> uiState.availableModels.filter { uiState.downloadedModels.contains(it.id) }
         }
 
+        // Info banner about offline models
+        if (uiState.downloadedModels.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp)
+                ) {
+                    Text(
+                        text = "For Offline Use / 离线使用",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Download a Gemma model (MediaPipe) for offline inference. These models work immediately without additional setup.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = "下载 Gemma 模型（MediaPipe）即可离线使用，无需额外配置。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(filteredModels, key = { it.id }) { model ->
+                // Check if this gated model needs HuggingFace token
+                val needsHfToken = model.format == ModelFormat.MEDIAPIPE && !uiState.hasHuggingFaceToken
                 ModelCard(
                     model = model,
                     isDownloaded = uiState.downloadedModels.contains(model.id),
@@ -106,6 +145,7 @@ fun ModelDownloadScreen(
                     downloadProgress = uiState.downloadProgress[model.id],
                     progressInfo = uiState.downloadProgressInfo[model.id],
                     error = uiState.downloadErrors[model.id],
+                    needsHfToken = needsHfToken,
                     onDownloadClick = { viewModel.startDownload(model.id) },
                     onCancelClick = { viewModel.cancelDownload(model.id) },
                     onDeleteClick = { showDeleteDialog = model.id },
@@ -396,6 +436,7 @@ private fun ModelCard(
     downloadProgress: Float?,
     progressInfo: DownloadProgressInfo?,
     error: String?,
+    needsHfToken: Boolean = false,
     onDownloadClick: () -> Unit,
     onCancelClick: () -> Unit,
     onDeleteClick: () -> Unit,
@@ -442,15 +483,44 @@ private fun ModelCard(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // Format badge
-                    Text(
-                        text = when (model.format) {
-                            ModelFormat.GGUF -> "llama.cpp (GGUF)"
-                            ModelFormat.MEDIAPIPE -> "MediaPipe"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    // Format badge with offline status
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = when (model.format) {
+                                ModelFormat.GGUF -> "llama.cpp (GGUF)"
+                                ModelFormat.MEDIAPIPE -> "MediaPipe"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        // Offline status indicator
+                        if (model.format == ModelFormat.MEDIAPIPE) {
+                            AssistChip(
+                                onClick = {},
+                                label = {
+                                    Text(
+                                        "Offline Ready",
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f),
+                                    labelColor = MaterialTheme.colorScheme.tertiary,
+                                    leadingIconContentColor = MaterialTheme.colorScheme.tertiary
+                                )
+                            )
+                        }
+                    }
                 }
 
                 // Status/Size
@@ -507,6 +577,134 @@ private fun ModelCard(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
+                }
+            }
+
+            // HuggingFace token warning for gated models (Gemma)
+            if (needsHfToken && !isDownloaded) {
+                val context = LocalContext.current
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "HuggingFace Token Required / 需要令牌",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Step 1: Accept License
+                        OutlinedButton(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://huggingface.co/litert-community/Gemma3-1B-IT"))
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.OpenInNew,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("1. Accept License / 接受许可证", style = MaterialTheme.typography.labelSmall)
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Step 2: Create Token
+                        OutlinedButton(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://huggingface.co/settings/tokens"))
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.OpenInNew,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("2. Create Token / 创建令牌", style = MaterialTheme.typography.labelSmall)
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = "3. Enter token in Settings / 在设置中输入令牌",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f),
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            // GGUF warning - native library required
+            if (model.format == ModelFormat.GGUF) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Requires native library setup",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                            Text(
+                                text = "For offline use, download a Gemma model (MediaPipe) instead",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                            )
+                            Text(
+                                text = "离线使用请下载 Gemma 模型（MediaPipe）",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
                 }
             }
 

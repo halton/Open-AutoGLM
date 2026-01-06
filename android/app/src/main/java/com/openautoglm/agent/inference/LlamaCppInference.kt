@@ -8,12 +8,15 @@ import com.openautoglm.agent.model.ContentPart
 import com.openautoglm.agent.model.MessageContent
 import com.openautoglm.agent.model.ModelClient
 import com.openautoglm.agent.model.ModelResponse
+import de.kherud.llama.InferenceParameters
+import de.kherud.llama.LlamaModel
+import de.kherud.llama.ModelParameters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * On-device inference client using llama.cpp via JNI.
+ * On-device inference client using llama.cpp via java-llama.cpp JNI bindings.
  *
  * This implementation provides local LLM inference using GGUF quantized models,
  * enabling offline operation with the same model as cloud API (AutoGLM-Phone-9B).
@@ -22,14 +25,6 @@ import java.io.File
  * - AutoGLM-Phone-9B Q4_K_M (6.17GB) - Same as cloud API
  * - AutoGLM-Phone-9B Q2_K (4.04GB) - Smaller, faster
  * - Other GGUF models compatible with llama.cpp
- *
- * IMPORTANT: This requires llama.cpp native library to be built and included.
- * See: https://github.com/ggml-org/llama.cpp/blob/master/docs/android.md
- *
- * To use this:
- * 1. Build llama.cpp for Android: cmake -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake ...
- * 2. Copy libllama.so to app/src/main/jniLibs/arm64-v8a/
- * 3. Download a GGUF model to device storage
  *
  * @param context Application context
  */
@@ -51,6 +46,7 @@ class LlamaCppInference(
         // Inference parameters
         private const val DEFAULT_CONTEXT_LENGTH = 4096
         private const val DEFAULT_MAX_TOKENS = 1024
+        private const val DEFAULT_THREADS = 4
 
         // Native library availability flag
         private var nativeLibraryLoaded = false
@@ -58,9 +54,12 @@ class LlamaCppInference(
 
         init {
             try {
-                System.loadLibrary("llama")
+                // java-llama.cpp loads the library automatically via LlamaLoader.initialize()
+                // which is called in LlamaModel's static block
+                // But we can also try to load it early to check availability
+                System.loadLibrary("jllama")
                 nativeLibraryLoaded = true
-                Log.i(TAG, "llama.cpp native library loaded successfully")
+                Log.i(TAG, "llama.cpp native library (jllama) loaded successfully")
             } catch (e: UnsatisfiedLinkError) {
                 nativeLibraryError = e.message
                 Log.w(TAG, "llama.cpp native library not available: ${e.message}")
@@ -75,10 +74,7 @@ class LlamaCppInference(
 
     // Current model state
     private var currentModelPath: String? = null
-    private var isModelLoaded = false
-
-    // Native context pointer (managed by JNI)
-    private var nativeContextPtr: Long = 0L
+    private var llamaModel: LlamaModel? = null
 
     /**
      * Checks if on-device inference is available.
@@ -146,7 +142,6 @@ class LlamaCppInference(
             if (!nativeLibraryLoaded) {
                 throw LlamaCppInferenceException(
                     "llama.cpp native library not available. " +
-                    "Please build and include libllama.so. " +
                     "Error: $nativeLibraryError"
                 )
             }
@@ -156,7 +151,7 @@ class LlamaCppInference(
                     ?: throw LlamaCppInferenceException("No GGUF model available. Please download AutoGLM-Phone-9B first.")
 
                 // Initialize or reinitialize if model changed
-                if (currentModelPath != modelFile.absolutePath || !isModelLoaded) {
+                if (currentModelPath != modelFile.absolutePath || llamaModel == null) {
                     initializeModel(modelFile.absolutePath)
                     currentModelPath = modelFile.absolutePath
                 }
@@ -166,12 +161,12 @@ class LlamaCppInference(
 
                 Log.d(TAG, "Running inference, prompt length: ${prompt.length}")
 
-                // Run inference
-                val rawOutput = nativeGenerate(
-                    contextPtr = nativeContextPtr,
-                    prompt = prompt,
-                    maxTokens = DEFAULT_MAX_TOKENS
-                )
+                // Run inference using java-llama.cpp
+                val inferenceParams = InferenceParameters(prompt)
+                    .setNPredict(DEFAULT_MAX_TOKENS)
+                    .setTemperature(0.7f)
+
+                val rawOutput = llamaModel!!.complete(inferenceParams)
 
                 val inferenceTime = System.currentTimeMillis() - startTime
                 Log.i(TAG, "Inference completed in ${inferenceTime}ms")
@@ -187,31 +182,26 @@ class LlamaCppInference(
     }
 
     /**
-     * Initializes the llama.cpp engine with a model.
+     * Initializes the llama.cpp engine with a model using java-llama.cpp.
      */
     private fun initializeModel(modelPath: String) {
         Log.i(TAG, "Initializing model: $modelPath")
 
-        // Release previous context if exists
-        if (nativeContextPtr != 0L) {
-            nativeFree(nativeContextPtr)
-            nativeContextPtr = 0L
-        }
-        isModelLoaded = false
+        // Release previous model if exists
+        llamaModel?.close()
+        llamaModel = null
 
         try {
-            nativeContextPtr = nativeLoadModel(
-                modelPath = modelPath,
-                contextLength = DEFAULT_CONTEXT_LENGTH,
-                gpuLayers = 0 // CPU only for now, GPU layers can be enabled if device supports
-            )
+            val modelParams = ModelParameters()
+                .setModel(modelPath)
+                .setCtxSize(DEFAULT_CONTEXT_LENGTH)
+                .setThreads(DEFAULT_THREADS)
+                .setThreadsBatch(DEFAULT_THREADS)
+                .setGpuLayers(0) // CPU only for now
 
-            if (nativeContextPtr == 0L) {
-                throw LlamaCppInferenceException("Failed to load model: nativeLoadModel returned null")
-            }
+            llamaModel = LlamaModel(modelParams)
 
-            isModelLoaded = true
-            Log.i(TAG, "Model initialized successfully, context: $nativeContextPtr")
+            Log.i(TAG, "Model initialized successfully")
 
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize model: ${e.message}", e)
@@ -332,52 +322,11 @@ class LlamaCppInference(
      * Releases resources and unloads the model.
      */
     fun release() {
-        if (nativeContextPtr != 0L) {
-            nativeFree(nativeContextPtr)
-            nativeContextPtr = 0L
-        }
+        llamaModel?.close()
+        llamaModel = null
         currentModelPath = null
-        isModelLoaded = false
         Log.i(TAG, "Model released")
     }
-
-    // ==================== Native JNI Methods ====================
-    // These must be implemented in libllama.so
-
-    /**
-     * Loads a GGUF model and returns a context pointer.
-     *
-     * @param modelPath Path to the GGUF model file
-     * @param contextLength Maximum context length in tokens
-     * @param gpuLayers Number of layers to offload to GPU (0 for CPU only)
-     * @return Native context pointer, or 0 on failure
-     */
-    private external fun nativeLoadModel(
-        modelPath: String,
-        contextLength: Int,
-        gpuLayers: Int
-    ): Long
-
-    /**
-     * Generates text completion from a prompt.
-     *
-     * @param contextPtr Native context pointer from nativeLoadModel
-     * @param prompt The input prompt
-     * @param maxTokens Maximum tokens to generate
-     * @return Generated text
-     */
-    private external fun nativeGenerate(
-        contextPtr: Long,
-        prompt: String,
-        maxTokens: Int
-    ): String
-
-    /**
-     * Frees the native context and unloads the model.
-     *
-     * @param contextPtr Native context pointer to free
-     */
-    private external fun nativeFree(contextPtr: Long)
 }
 
 /**

@@ -10,6 +10,7 @@ import com.openautoglm.agent.inference.ModelDownloadManager
 import com.openautoglm.agent.inference.ModelFormat
 import com.openautoglm.agent.inference.ModelInfo
 import com.openautoglm.agent.inference.NetworkTestResult
+import com.openautoglm.agent.inference.SecureKeyStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +29,7 @@ class ModelDownloadViewModel(application: Application) : AndroidViewModel(applic
     }
 
     private val downloadManager = ModelDownloadManager(application)
+    private val secureStorage = SecureKeyStorage(application)
 
     // UI State
     private val _uiState = MutableStateFlow(ModelDownloadUiState())
@@ -39,6 +41,24 @@ class ModelDownloadViewModel(application: Application) : AndroidViewModel(applic
         observeMirrorState()
         // Auto-test network on init
         testNetworkConnectivity()
+        // Check HuggingFace token status
+        checkHuggingFaceToken()
+    }
+
+    /**
+     * Checks if HuggingFace token is configured.
+     */
+    private fun checkHuggingFaceToken() {
+        val hasToken = secureStorage.hasHuggingFaceToken()
+        _uiState.value = _uiState.value.copy(hasHuggingFaceToken = hasToken)
+    }
+
+    /**
+     * Refreshes the HuggingFace token status.
+     * Call this when returning from settings screen.
+     */
+    fun refreshTokenStatus() {
+        checkHuggingFaceToken()
     }
 
     /**
@@ -164,6 +184,7 @@ class ModelDownloadViewModel(application: Application) : AndroidViewModel(applic
     /**
      * Starts downloading a model.
      * Tests network connectivity first if not already tested.
+     * For gated models (Gemma), checks HuggingFace token first.
      *
      * @param modelId The model identifier to download
      * @param requireWifi If true, only download on WiFi (default true)
@@ -173,6 +194,30 @@ class ModelDownloadViewModel(application: Application) : AndroidViewModel(applic
 
         viewModelScope.launch {
             try {
+                // Check if this is a gated model (MediaPipe/Gemma) and if we have a token
+                val modelInfo = _uiState.value.availableModels.find { it.id == modelId }
+                val isGatedModel = modelInfo?.format == ModelFormat.MEDIAPIPE
+
+                if (isGatedModel && !secureStorage.hasHuggingFaceToken()) {
+                    Log.w(TAG, "Gated model requires HuggingFace token: $modelId")
+                    _uiState.value = _uiState.value.copy(
+                        downloadErrors = _uiState.value.downloadErrors + (modelId to
+                            "HuggingFace Token Required\n\n" +
+                            "This model requires authentication. Please:\n" +
+                            "1. Go to Settings\n" +
+                            "2. Accept license at huggingface.co/litert-community/Gemma3-1B-IT\n" +
+                            "3. Create token at huggingface.co/settings/tokens\n" +
+                            "4. Enter token in HuggingFace Token field\n\n" +
+                            "需要 HuggingFace 令牌\n\n" +
+                            "此模型需要认证，请：\n" +
+                            "1. 前往设置\n" +
+                            "2. 在 huggingface.co/litert-community/Gemma3-1B-IT 接受许可证\n" +
+                            "3. 在 huggingface.co/settings/tokens 创建令牌\n" +
+                            "4. 在 HuggingFace 令牌字段中输入令牌")
+                    )
+                    return@launch
+                }
+
                 // Test network first if not tested
                 val selectedMirror = _uiState.value.selectedMirror
                 val testResult = _uiState.value.networkTestResults[selectedMirror]
@@ -337,7 +382,9 @@ data class ModelDownloadUiState(
     // Mirror-related state
     val selectedMirror: DownloadMirror = DownloadMirror.HUGGINGFACE,
     val networkTestResults: Map<DownloadMirror, NetworkTestResult> = emptyMap(),
-    val isTestingNetwork: Boolean = false
+    val isTestingNetwork: Boolean = false,
+    // HuggingFace token status (required for gated models like Gemma)
+    val hasHuggingFaceToken: Boolean = false
 )
 
 /**

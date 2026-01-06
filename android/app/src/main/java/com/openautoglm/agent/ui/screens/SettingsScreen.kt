@@ -1,16 +1,23 @@
 package com.openautoglm.agent.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.openautoglm.agent.data.entities.InferenceMode
 import com.openautoglm.agent.inference.InferenceProvider
 import com.openautoglm.agent.ui.viewmodels.SettingsViewModel
 
@@ -70,6 +77,12 @@ fun SettingsScreen(
                 }
             }
         } else {
+            // Show different message based on inference mode
+            val warningMessage = when (uiState.inferenceMode) {
+                InferenceMode.ON_DEVICE -> "On-device model required. Download a model below."
+                InferenceMode.CLOUD -> "API key required to use the agent"
+                InferenceMode.AUTO -> "API key or on-device model required"
+            }
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer
@@ -88,7 +101,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "API key required to use the agent",
+                        text = warningMessage,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
@@ -98,32 +111,208 @@ fun SettingsScreen(
 
         Divider()
 
-        // Provider Selection
+        // Inference Mode Selection
         Text(
-            text = "Inference Provider",
+            text = "Inference Mode / 推理模式",
             style = MaterialTheme.typography.titleMedium
         )
 
-        InferenceProvider.values().forEach { provider ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RadioButton(
-                    selected = uiState.selectedProvider == provider,
-                    onClick = { viewModel.selectProvider(provider) }
-                )
-                Text(
-                    text = when (provider) {
-                        InferenceProvider.BIGMODEL -> "BigModel (AutoGLM-Phone)"
-                        InferenceProvider.DASHSCOPE -> "DashScope (Qwen2.5-VL-72B)"
-                        InferenceProvider.OPENAI -> "OpenAI (GPT-4 Vision)"
-                        InferenceProvider.CUSTOM -> "Custom API"
-                    },
-                    modifier = Modifier.padding(start = 8.dp)
-                )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                InferenceMode.entries.forEach { mode ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = uiState.inferenceMode == mode,
+                            onClick = { viewModel.updateInferenceMode(mode) }
+                        )
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            Text(
+                                text = when (mode) {
+                                    InferenceMode.CLOUD -> "Cloud / 云端"
+                                    InferenceMode.ON_DEVICE -> "On-Device / 本地"
+                                    InferenceMode.AUTO -> "Auto / 自动"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (uiState.inferenceMode == mode) FontWeight.Bold else FontWeight.Normal
+                            )
+                            Text(
+                                text = when (mode) {
+                                    InferenceMode.CLOUD -> "Use cloud APIs (requires API key)"
+                                    InferenceMode.ON_DEVICE -> "Use downloaded models (offline capable)"
+                                    InferenceMode.AUTO -> "Auto-select based on availability"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
         }
+
+        // On-Device Model Selection (shown when On-Device or Auto mode)
+        if (uiState.inferenceMode != InferenceMode.CLOUD) {
+            if (uiState.downloadedModels.isNotEmpty()) {
+                Text(
+                    text = "Select On-Device Model / 选择本地模型",
+                    style = MaterialTheme.typography.titleSmall
+                )
+
+                var modelExpanded by remember { mutableStateOf(false) }
+                val selectedModel = uiState.downloadedModels.find { it.id == uiState.selectedOnDeviceModel }
+                    ?: uiState.downloadedModels.firstOrNull()
+
+                ExposedDropdownMenuBox(
+                    expanded = modelExpanded,
+                    onExpandedChange = { modelExpanded = !modelExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = selectedModel?.displayName ?: "Select a model",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Model") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelExpanded) }
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = modelExpanded,
+                        onDismissRequest = { modelExpanded = false }
+                    ) {
+                        uiState.downloadedModels.forEach { model ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(model.displayName)
+                                        Text(
+                                            text = "${model.sizeMB} MB",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    viewModel.updateSelectedOnDeviceModel(model.id)
+                                    modelExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "No models downloaded",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Text(
+                            text = "Download a model from 'Manage On-Device Models' to use on-device inference.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = onNavigateToModelDownload,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Download Models")
+                        }
+                    }
+                }
+            }
+        }
+
+        Divider()
+
+        // Cloud Provider Selection (shown when Cloud or Auto mode)
+        if (uiState.inferenceMode != InferenceMode.ON_DEVICE) {
+            Text(
+                text = "Cloud Provider / 云端服务商",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            InferenceProvider.entries.forEach { provider ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = uiState.selectedProvider == provider,
+                        onClick = { viewModel.selectProvider(provider) }
+                    )
+                    Text(
+                        text = when (provider) {
+                            InferenceProvider.BIGMODEL -> "BigModel (AutoGLM-Phone)"
+                            InferenceProvider.DASHSCOPE -> "DashScope (Qwen2.5-VL-72B)"
+                            InferenceProvider.OPENAI -> "OpenAI (GPT-4 Vision)"
+                            InferenceProvider.CUSTOM -> "Custom API"
+                        },
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+            }
+
+            Divider()
+
+            // API Key Configuration based on selected provider
+            when (uiState.selectedProvider) {
+                InferenceProvider.BIGMODEL -> {
+                    BigModelSettings(
+                        apiKey = uiState.bigModelApiKey,
+                        modelId = uiState.bigModelModelId,
+                        showApiKey = showApiKey,
+                        onApiKeyChange = { viewModel.updateBigModelApiKey(it) },
+                        onModelIdChange = { viewModel.updateBigModelModelId(it) },
+                        onToggleVisibility = { showApiKey = !showApiKey }
+                    )
+                }
+                InferenceProvider.DASHSCOPE -> {
+                    DashScopeSettings(
+                        apiKey = uiState.dashScopeApiKey,
+                        modelId = uiState.dashScopeModelId,
+                        showApiKey = showApiKey,
+                        onApiKeyChange = { viewModel.updateDashScopeApiKey(it) },
+                        onModelIdChange = { viewModel.updateDashScopeModelId(it) },
+                        onToggleVisibility = { showApiKey = !showApiKey }
+                    )
+                }
+                InferenceProvider.OPENAI -> {
+                    OpenAISettings(
+                        apiKey = uiState.openAiApiKey,
+                        showApiKey = showApiKey,
+                        onApiKeyChange = { viewModel.updateOpenAiApiKey(it) },
+                        onToggleVisibility = { showApiKey = !showApiKey }
+                    )
+                }
+                InferenceProvider.CUSTOM -> {
+                    CustomApiSettings(
+                        apiKey = uiState.customApiKey,
+                        baseUrl = uiState.customBaseUrl,
+                        showApiKey = showApiKey,
+                        onApiKeyChange = { viewModel.updateCustomApiKey(it) },
+                        onBaseUrlChange = { viewModel.updateCustomBaseUrl(it) },
+                        onToggleVisibility = { showApiKey = !showApiKey }
+                    )
+                }
+            }
+        } // End of cloud provider section
 
         Divider()
 
@@ -159,44 +348,110 @@ fun SettingsScreen(
 
         Divider()
 
-        // API Key Configuration based on selected provider
-        when (uiState.selectedProvider) {
-            InferenceProvider.BIGMODEL -> {
-                BigModelSettings(
-                    apiKey = uiState.bigModelApiKey,
-                    modelId = uiState.bigModelModelId,
-                    showApiKey = showApiKey,
-                    onApiKeyChange = { viewModel.updateBigModelApiKey(it) },
-                    onModelIdChange = { viewModel.updateBigModelModelId(it) },
-                    onToggleVisibility = { showApiKey = !showApiKey }
+        // HuggingFace Token Section (for downloading gated models like Gemma)
+        Text(
+            text = "HuggingFace Token / HuggingFace 令牌",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        val context = LocalContext.current
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    text = "Required for downloading Gemma models (gated on HuggingFace).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-            InferenceProvider.DASHSCOPE -> {
-                DashScopeSettings(
-                    apiKey = uiState.dashScopeApiKey,
-                    modelId = uiState.dashScopeModelId,
-                    showApiKey = showApiKey,
-                    onApiKeyChange = { viewModel.updateDashScopeApiKey(it) },
-                    onModelIdChange = { viewModel.updateDashScopeModelId(it) },
-                    onToggleVisibility = { showApiKey = !showApiKey }
+                Text(
+                    text = "下载 Gemma 模型需要此令牌（在 HuggingFace 上需要授权）。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                 )
-            }
-            InferenceProvider.OPENAI -> {
-                OpenAISettings(
-                    apiKey = uiState.openAiApiKey,
-                    showApiKey = showApiKey,
-                    onApiKeyChange = { viewModel.updateOpenAiApiKey(it) },
-                    onToggleVisibility = { showApiKey = !showApiKey }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Step 1: Accept License Button
+                Text(
+                    text = "Step 1: Accept Gemma License / 第一步：接受许可证",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-            InferenceProvider.CUSTOM -> {
-                CustomApiSettings(
-                    apiKey = uiState.customApiKey,
-                    baseUrl = uiState.customBaseUrl,
-                    showApiKey = showApiKey,
-                    onApiKeyChange = { viewModel.updateCustomApiKey(it) },
-                    onBaseUrlChange = { viewModel.updateCustomBaseUrl(it) },
-                    onToggleVisibility = { showApiKey = !showApiKey }
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://huggingface.co/litert-community/Gemma3-1B-IT"))
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.OpenInNew,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Open Gemma License Page")
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Step 2: Create Token Button
+                Text(
+                    text = "Step 2: Create Token / 第二步：创建令牌",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://huggingface.co/settings/tokens"))
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.OpenInNew,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Open Token Settings (Read scope)")
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Step 3: Enter Token
+                Text(
+                    text = "Step 3: Enter Token Below / 第三步：在下方输入令牌",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                var showHfToken by remember { mutableStateOf(false) }
+                OutlinedTextField(
+                    value = uiState.huggingFaceToken,
+                    onValueChange = { viewModel.updateHuggingFaceToken(it) },
+                    label = { Text("HuggingFace Token") },
+                    placeholder = { Text("hf_...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (showHfToken) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        TextButton(onClick = { showHfToken = !showHfToken }) {
+                            Text(if (showHfToken) "Hide" else "Show")
+                        }
+                    },
+                    singleLine = true
                 )
             }
         }

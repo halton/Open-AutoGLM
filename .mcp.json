@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "coding-flow": {
+      "command": "node",
+      "args": [
+        "/Users/halton/.imcp/npm_requirements/coding-flow/latest/node_modules/coding-flow/build/servers/coding_flow_server.js"
+      ],
+      "env": {
+        "SOURCE": "ClaudeCode"
+      },
+      "type": "stdio"
+    }
+  }
+}
+git
