@@ -10,9 +10,9 @@ configuration:
     role: Maintain
   - member: haltonhuo
     role: Maintain
-  - member: daimingpan
-    role: Write
   - team: edgechinaawmdev
+    role: Write
+  - member: daimingpan
     role: Write
   - member: ericwa
     role: Write
@@ -24,8 +24,6 @@ configuration:
     role: Write
   - member: linguo2
     role: Write
-  - member: qi.yang
-    role: Write
   - member: ranyu
     role: Write
   - member: shulianghan
@@ -33,6 +31,8 @@ configuration:
   - member: tandavid
     role: Write
   - member: yananzhao
+    role: Write
+  - member: yangqi
     role: Write
   - member: ygu
     role: Write
