@@ -87,10 +87,41 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
     // Voice input support - uses UnifiedVoiceInputManager to support both Android and Vosk
     private val secureStorage = SecureKeyStorage(application)
-    private val speechRecognizerType: SpeechRecognizerType = try {
+    private val preferredSpeechRecognizerType: SpeechRecognizerType = try {
         SpeechRecognizerType.valueOf(secureStorage.getSpeechRecognizerType())
     } catch (e: IllegalArgumentException) {
         SpeechRecognizerType.ANDROID_BUILTIN
+    }
+
+    // Determine actual speech recognizer type based on availability
+    private val speechRecognizerType: SpeechRecognizerType = run {
+        when (preferredSpeechRecognizerType) {
+            SpeechRecognizerType.WHISPER_OFFLINE -> {
+                // Check if Whisper model is downloaded
+                if (com.openautoglm.agent.voice.VoiceInputManagerFactory.isWhisperAvailable(application)) {
+                    android.util.Log.d("TaskViewModel", "Using Whisper (model available)")
+                    SpeechRecognizerType.WHISPER_OFFLINE
+                } else {
+                    android.util.Log.d("TaskViewModel", "Whisper model not available, falling back to Android built-in")
+                    SpeechRecognizerType.ANDROID_BUILTIN
+                }
+            }
+            SpeechRecognizerType.VOSK_OFFLINE -> {
+                // Check if Vosk model is downloaded
+                val locale = VoiceInputConfig.fromAgentLanguage(config.language).locale
+                if (com.openautoglm.agent.voice.VoiceInputManagerFactory.isVoskAvailable(application, locale)) {
+                    android.util.Log.d("TaskViewModel", "Using Vosk (model available)")
+                    SpeechRecognizerType.VOSK_OFFLINE
+                } else {
+                    android.util.Log.d("TaskViewModel", "Vosk model not available, falling back to Android built-in")
+                    SpeechRecognizerType.ANDROID_BUILTIN
+                }
+            }
+            SpeechRecognizerType.ANDROID_BUILTIN -> {
+                android.util.Log.d("TaskViewModel", "Using Android built-in SpeechRecognizer")
+                SpeechRecognizerType.ANDROID_BUILTIN
+            }
+        }
     }
 
     private val voiceInputManager: VoiceInputManager = UnifiedVoiceInputManager(
@@ -107,9 +138,22 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Whether speech recognition is available on this device.
+     * This is a StateFlow to trigger recomposition when availability changes.
      */
-    val isVoiceInputAvailable: Boolean
-        get() = voiceInputManager.isAvailable
+    private val _isVoiceInputAvailable = MutableStateFlow(voiceInputManager.isAvailable).also {
+        android.util.Log.d("TaskViewModel", "Initial isVoiceInputAvailable: ${it.value}")
+    }
+    val isVoiceInputAvailable: StateFlow<Boolean> = _isVoiceInputAvailable.asStateFlow()
+
+    /**
+     * Refresh voice input availability check.
+     * Call this after model downloads or when returning to the screen.
+     */
+    fun refreshVoiceInputAvailability() {
+        val newValue = voiceInputManager.isAvailable
+        android.util.Log.d("TaskViewModel", "refreshVoiceInputAvailability: $newValue")
+        _isVoiceInputAvailable.value = newValue
+    }
 
     private val _audioPermissionState = MutableStateFlow(
         PermissionHandler.checkAudioPermissionState(application)

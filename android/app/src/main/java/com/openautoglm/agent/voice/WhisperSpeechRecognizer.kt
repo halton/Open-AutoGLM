@@ -102,6 +102,28 @@ class WhisperSpeechRecognizer(
         }
 
         /**
+         * Check if any Whisper model is available.
+         */
+        fun isAnyModelAvailable(context: Context): Boolean {
+            return isModelDownloaded(context, MODEL_NAME_TINY) ||
+                   isModelDownloaded(context, MODEL_NAME_BASE) ||
+                   isModelDownloaded(context, MODEL_NAME_SMALL)
+        }
+
+        /**
+         * Get the first available model, or default to tiny if none found.
+         * Priority: tiny > base > small (smaller models load faster)
+         */
+        fun getAvailableModelName(context: Context): String {
+            return when {
+                isModelDownloaded(context, MODEL_NAME_TINY) -> MODEL_NAME_TINY
+                isModelDownloaded(context, MODEL_NAME_BASE) -> MODEL_NAME_BASE
+                isModelDownloaded(context, MODEL_NAME_SMALL) -> MODEL_NAME_SMALL
+                else -> MODEL_NAME_TINY  // Default, will fail gracefully
+            }
+        }
+
+        /**
          * Get default model name based on device capabilities.
          * Uses tiny model for most devices to balance accuracy and speed.
          */
@@ -145,11 +167,11 @@ class WhisperSpeechRecognizer(
     private val audioBuffer = mutableListOf<Float>()
     private var lastPartialText: String = ""
 
-    // Model name to use
-    private var modelName: String = getDefaultModelName()
+    // Model name to use - automatically detect available model
+    private var modelName: String = getAvailableModelName(context)
 
     override val isAvailable: Boolean
-        get() = isModelDownloaded(context, modelName)
+        get() = isAnyModelAvailable(context)
 
     /**
      * Set the model to use for recognition.
@@ -423,12 +445,16 @@ class WhisperSpeechRecognizer(
                 context.transcribeData(audioData)
             }
 
-            val text = result.trim()
-            Log.i(TAG, "Transcription result: '$text'")
+            val rawText = result.trim()
+            Log.i(TAG, "Transcription result: '$rawText'")
 
-            if (text.isNotEmpty()) {
+            // Clean up the transcription - remove timestamps like [00:00:00.000 --> 00:00:01.500]:
+            val cleanedText = cleanTranscription(rawText)
+            Log.i(TAG, "Cleaned transcription: '$cleanedText'")
+
+            if (cleanedText.isNotEmpty()) {
                 _state.value = VoiceInputState.Result(
-                    transcription = text,
+                    transcription = cleanedText,
                     confidence = null // Whisper doesn't provide per-word confidence
                 )
             } else {
@@ -479,5 +505,22 @@ class WhisperSpeechRecognizer(
             }
         }
         Log.d(TAG, "WhisperSpeechRecognizer destroyed")
+    }
+
+    /**
+     * Clean up the transcription result by removing timestamps.
+     * Whisper outputs text with timestamps like: [00:00:00.000 --> 00:00:01.500]:  Hello
+     * This function extracts just the text content.
+     */
+    private fun cleanTranscription(rawText: String): String {
+        // Pattern to match timestamps like [00:00:00.000 --> 00:00:01.500]:
+        val timestampPattern = Regex("""\[\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}\]:\s*""")
+
+        // Remove all timestamp markers and join the text
+        val cleanedLines = rawText.split("\n")
+            .map { line -> timestampPattern.replace(line, "").trim() }
+            .filter { it.isNotEmpty() }
+
+        return cleanedLines.joinToString(" ").trim()
     }
 }

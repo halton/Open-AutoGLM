@@ -152,14 +152,15 @@ fun VoiceInputIconButton(
 
     val iconColor = when {
         !enabled || permissionDenied -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-        isListening -> MaterialTheme.colorScheme.primary
+        isListening -> MaterialTheme.colorScheme.error  // Red when listening to indicate "tap to stop"
         isProcessing -> MaterialTheme.colorScheme.secondary
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.primary  // Use primary color for better visibility
     }
 
     IconButton(
         onClick = onClick,
-        enabled = enabled && !isProcessing,
+        // Button should remain enabled during listening and processing so user can stop/cancel
+        enabled = enabled,
         modifier = modifier
     ) {
         when {
@@ -178,7 +179,7 @@ fun VoiceInputIconButton(
                         permissionDenied -> stringResource(R.string.voice_permission_denied)
                         else -> stringResource(R.string.voice_start_listening)
                     },
-                    tint = if (isListening) MaterialTheme.colorScheme.error else iconColor
+                    tint = iconColor
                 )
             }
         }

@@ -61,7 +61,12 @@ fun TaskScreen(
     // Voice input state
     val voiceInputState by viewModel.voiceInputState.collectAsState()
     val audioPermissionState by viewModel.audioPermissionState.collectAsState()
-    val isVoiceAvailable = viewModel.isVoiceInputAvailable
+    val isVoiceAvailable by viewModel.isVoiceInputAvailable.collectAsState()
+
+    // Refresh voice availability on screen start
+    LaunchedEffect(Unit) {
+        viewModel.refreshVoiceInputAvailability()
+    }
 
     // Permission rationale dialog state
     var showPermissionRationale by remember { mutableStateOf(false) }
@@ -104,7 +109,8 @@ fun TaskScreen(
                 viewModel.stopVoiceInput()
             }
             is VoiceInputState.Processing -> {
-                // Do nothing while processing
+                // Cancel processing - user wants to abort
+                viewModel.cancelVoiceInput()
             }
             else -> {
                 // Check permission and start listening
@@ -161,12 +167,17 @@ fun TaskScreen(
             maxLines = 6,
             enabled = agentState is AgentState.Idle,
             trailingIcon = {
-                if (isVoiceAvailable && agentState is AgentState.Idle) {
+                // Show voice button when:
+                // 1. Voice is available AND agent is idle (normal case)
+                // 2. Voice input is currently active (listening or processing)
+                val isVoiceActive = voiceInputState is VoiceInputState.Listening ||
+                                    voiceInputState is VoiceInputState.Processing
+                if (isVoiceAvailable && (agentState is AgentState.Idle || isVoiceActive)) {
                     VoiceInputIconButton(
                         voiceState = voiceInputState,
                         permissionState = audioPermissionState,
                         onClick = onVoiceButtonClick,
-                        enabled = agentState is AgentState.Idle
+                        enabled = agentState is AgentState.Idle || isVoiceActive
                     )
                 }
             },

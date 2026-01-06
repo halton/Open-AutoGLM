@@ -55,10 +55,11 @@ object VoiceInputManagerFactory {
     }
 
     /**
-     * Check if Whisper is available (model downloaded).
+     * Check if Whisper is available (any model downloaded).
      */
     fun isWhisperAvailable(context: Context, modelName: String = WhisperSpeechRecognizer.MODEL_NAME_TINY): Boolean {
-        return WhisperSpeechRecognizer.isModelDownloaded(context, modelName)
+        // Check if any Whisper model is available, not just a specific one
+        return WhisperSpeechRecognizer.isAnyModelAvailable(context)
     }
 
     /**
