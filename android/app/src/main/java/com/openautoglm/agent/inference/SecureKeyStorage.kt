@@ -55,6 +55,9 @@ class SecureKeyStorage(context: Context) {
         private const val KEY_SELECTED_ON_DEVICE_MODEL = "selected_on_device_model"
         private const val KEY_HUGGINGFACE_TOKEN = "huggingface_token"
 
+        // Voice recognition settings
+        private const val KEY_SPEECH_RECOGNIZER_TYPE = "speech_recognizer_type"
+
         // Default model IDs
         const val DEFAULT_BIGMODEL_MODEL = "AutoGLM-Phone"
         const val DEFAULT_DASHSCOPE_MODEL = "qwen2.5-vl-72b-instruct"
@@ -366,6 +369,29 @@ class SecureKeyStorage(context: Context) {
         sharedPreferences.edit()
             .remove(KEY_HUGGINGFACE_TOKEN)
             .apply()
+    }
+
+    // ========== Voice Recognition Settings ==========
+
+    /**
+     * Sets the speech recognizer type (Android built-in or Vosk offline).
+     *
+     * @param type The recognizer type name ("ANDROID_BUILTIN" or "VOSK_OFFLINE")
+     */
+    fun setSpeechRecognizerType(type: String) {
+        sharedPreferences.edit()
+            .putString(KEY_SPEECH_RECOGNIZER_TYPE, type)
+            .apply()
+    }
+
+    /**
+     * Gets the speech recognizer type.
+     *
+     * @return The recognizer type name, or "ANDROID_BUILTIN" as default
+     */
+    fun getSpeechRecognizerType(): String {
+        return sharedPreferences.getString(KEY_SPEECH_RECOGNIZER_TYPE, "ANDROID_BUILTIN")
+            ?: "ANDROID_BUILTIN"
     }
 }
 

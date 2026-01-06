@@ -192,6 +192,51 @@ class ModelDownloadManager(
                 descriptionZh = "备选 - INT4量化，支持4096 token上下文",
                 supportsVision = false,
                 format = ModelFormat.MEDIAPIPE
+            ),
+
+            // ========== Whisper Speech Recognition Models (.bin format) ==========
+            // These are for offline speech-to-text using Whisper.cpp
+
+            // Whisper Tiny - Fastest, suitable for mobile
+            "whisper-tiny" to ModelInfo(
+                id = "whisper-tiny",
+                displayName = "Whisper Tiny",
+                fileName = "ggml-tiny.bin",
+                downloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
+                sizeBytes = 75_000_000L, // ~75MB
+                minRamMB = 512,
+                description = "Speech recognition - fastest, suitable for mobile",
+                descriptionZh = "语音识别 - 最快速，适合移动设备",
+                supportsVision = false,
+                format = ModelFormat.WHISPER
+            ),
+
+            // Whisper Base - Balanced accuracy and speed
+            "whisper-base" to ModelInfo(
+                id = "whisper-base",
+                displayName = "Whisper Base",
+                fileName = "ggml-base.bin",
+                downloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+                sizeBytes = 142_000_000L, // ~142MB
+                minRamMB = 1024,
+                description = "Speech recognition - balanced accuracy and speed",
+                descriptionZh = "语音识别 - 准确率与速度平衡",
+                supportsVision = false,
+                format = ModelFormat.WHISPER
+            ),
+
+            // Whisper Small - High accuracy, slower
+            "whisper-small" to ModelInfo(
+                id = "whisper-small",
+                displayName = "Whisper Small",
+                fileName = "ggml-small.bin",
+                downloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+                sizeBytes = 466_000_000L, // ~466MB
+                minRamMB = 2048,
+                description = "Speech recognition - high accuracy, slower",
+                descriptionZh = "语音识别 - 高准确率，较慢",
+                supportsVision = false,
+                format = ModelFormat.WHISPER
             )
         )
     }
@@ -374,10 +419,10 @@ class ModelDownloadManager(
         Log.i(TAG, "Starting download for model: $modelId from ${_selectedMirror.value.displayName}")
         Log.i(TAG, "Download URL: $downloadUrl")
 
-        // Use CONNECTED to allow both WiFi and cellular downloads
-        // Users on cellular should be aware of large file sizes from the UI
+        // Use NOT_REQUIRED for network constraints - we handle network connectivity manually
+        // This allows downloads to start even when network validation is pending
         val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
             .setRequiresStorageNotLow(true)
             .build()
 
@@ -510,6 +555,13 @@ class ModelDownloadManager(
         return AVAILABLE_MODELS.values.filter { it.isMediaPipe }
     }
 
+    /**
+     * Gets Whisper models only (for speech recognition).
+     */
+    fun getWhisperModels(): List<ModelInfo> {
+        return AVAILABLE_MODELS.values.filter { it.isWhisper }
+    }
+
     private fun updateDownloadState(modelId: String, state: DownloadState) {
         _downloadStates.value = _downloadStates.value.toMutableMap().apply {
             put(modelId, state)
@@ -558,7 +610,7 @@ class ModelDownloadManager(
     fun getTotalModelSizeMB(): Long {
         var total = 0L
         modelsDir.listFiles()?.forEach { file ->
-            if (file.extension == "task" || file.extension == "gguf") {
+            if (file.extension == "task" || file.extension == "gguf" || file.extension == "bin") {
                 total += file.length()
             }
         }
@@ -644,8 +696,9 @@ class ModelDownloadManager(
 
             response.close()
 
-            if (response.isSuccessful || response.code == 302 || response.code == 301) {
-                Log.i(TAG, "${mirror.displayName} is reachable (latency: ${latency}ms)")
+            if (response.isSuccessful || response.code == 302 || response.code == 301 || response.code == 429) {
+                // 429 = rate limited, but server is reachable (actual downloads will work)
+                Log.i(TAG, "${mirror.displayName} is reachable (latency: ${latency}ms, code: ${response.code})")
                 NetworkTestResult.Success(mirror, latency)
             } else {
                 Log.w(TAG, "${mirror.displayName} returned error: ${response.code}")
@@ -724,7 +777,9 @@ enum class ModelFormat {
     /** MediaPipe LLM Inference API (.task files) */
     MEDIAPIPE,
     /** llama.cpp GGUF format (.gguf files) */
-    GGUF
+    GGUF,
+    /** Whisper.cpp speech recognition models (.bin files) */
+    WHISPER
 }
 
 /**
@@ -749,6 +804,9 @@ data class ModelInfo(
 
     /** Returns true if this is a MediaPipe model */
     val isMediaPipe: Boolean get() = format == ModelFormat.MEDIAPIPE
+
+    /** Returns true if this is a Whisper speech recognition model */
+    val isWhisper: Boolean get() = format == ModelFormat.WHISPER
 }
 
 /**

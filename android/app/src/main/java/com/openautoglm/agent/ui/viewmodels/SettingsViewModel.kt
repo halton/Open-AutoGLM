@@ -9,10 +9,16 @@ import com.openautoglm.agent.inference.InferenceProvider
 import com.openautoglm.agent.inference.ModelDownloadManager
 import com.openautoglm.agent.inference.ModelInfo
 import com.openautoglm.agent.inference.SecureKeyStorage
+import com.openautoglm.agent.voice.SpeechRecognizerType
+import com.openautoglm.agent.voice.VoskModelDownloadManager
+import com.openautoglm.agent.voice.VoskModelDownloadState
+import com.openautoglm.agent.voice.VoskModelInfo
+import com.openautoglm.agent.voice.WhisperModelInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 /**
  * ViewModel for the Settings screen.
@@ -24,14 +30,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val secureStorage = SecureKeyStorage(application)
     private val cloudInference = CloudInference(application)
     private val downloadManager = ModelDownloadManager(application)
+    private val voskModelManager = VoskModelDownloadManager(application)
 
     // UI State
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
+    // Vosk download state
+    val voskDownloadState: StateFlow<VoskModelDownloadState> = voskModelManager.downloadState
+
     init {
         loadCurrentSettings()
         loadDownloadedModels()
+        loadVoskModels()
+        loadWhisperModels()
     }
 
     /**
@@ -52,6 +64,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             InferenceMode.AUTO -> hasCloudApiKey || hasDownloadedModels
         }
 
+        // Load speech recognizer type
+        val speechRecognizerTypeName = secureStorage.getSpeechRecognizerType()
+        val speechRecognizerType = try {
+            SpeechRecognizerType.valueOf(speechRecognizerTypeName)
+        } catch (e: IllegalArgumentException) {
+            SpeechRecognizerType.ANDROID_BUILTIN
+        }
+
         _uiState.value = SettingsUiState(
             selectedProvider = selectedProvider,
             bigModelApiKey = secureStorage.getBigModelApiKey() ?: "",
@@ -64,7 +84,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             isConfigured = isConfigured,
             inferenceMode = inferenceMode,
             selectedOnDeviceModel = secureStorage.getSelectedOnDeviceModel(),
-            huggingFaceToken = secureStorage.getHuggingFaceToken() ?: ""
+            huggingFaceToken = secureStorage.getHuggingFaceToken() ?: "",
+            speechRecognizerType = speechRecognizerType
         )
     }
 
@@ -75,6 +96,49 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val downloadedModels = downloadManager.getDownloadedModels()
         _uiState.value = _uiState.value.copy(
             downloadedModels = downloadedModels
+        )
+    }
+
+    /**
+     * Loads Vosk model information.
+     */
+    private fun loadVoskModels() {
+        val availableVoskModels = VoskModelDownloadManager.AVAILABLE_MODELS
+        val downloadedVoskModels = voskModelManager.getDownloadedModels()
+
+        _uiState.value = _uiState.value.copy(
+            availableVoskModels = availableVoskModels,
+            downloadedVoskModels = downloadedVoskModels
+        )
+    }
+
+    /**
+     * Loads Whisper model information.
+     */
+    private fun loadWhisperModels() {
+        // Get downloaded Whisper models from the main ModelDownloadManager
+        // (Whisper models are downloaded via ModelDownloadScreen, not separately)
+        val downloadedWhisperModels = downloadManager.getWhisperModels()
+            .filter { downloadManager.isModelDownloaded(it.id) }
+            .map { modelInfo ->
+                // Convert ModelInfo to WhisperModelInfo for the UI
+                WhisperModelInfo(
+                    id = modelInfo.fileName, // Use filename as ID (e.g., "ggml-tiny.bin")
+                    name = modelInfo.displayName,
+                    url = modelInfo.downloadUrl,
+                    sizeMB = modelInfo.sizeMB.toInt(),
+                    description = modelInfo.description,
+                    accuracy = when {
+                        modelInfo.id.contains("tiny") -> "~70% WER"
+                        modelInfo.id.contains("base") -> "~60% WER"
+                        modelInfo.id.contains("small") -> "~45% WER"
+                        else -> ""
+                    }
+                )
+            }
+
+        _uiState.value = _uiState.value.copy(
+            downloadedWhisperModels = downloadedWhisperModels
         )
     }
 
@@ -298,6 +362,80 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun clearError() {
         _uiState.value = _uiState.value.copy(saveError = null)
     }
+
+    // ========== Voice Recognition Settings ==========
+
+    /**
+     * Updates the speech recognizer type.
+     */
+    fun updateSpeechRecognizerType(type: SpeechRecognizerType) {
+        _uiState.value = _uiState.value.copy(speechRecognizerType = type)
+        secureStorage.setSpeechRecognizerType(type.name)
+    }
+
+    /**
+     * Downloads a Vosk model.
+     */
+    fun downloadVoskModel(modelInfo: VoskModelInfo) {
+        viewModelScope.launch {
+            val success = voskModelManager.downloadModel(modelInfo)
+            if (success) {
+                loadVoskModels()
+            }
+        }
+    }
+
+    /**
+     * Deletes a Vosk model.
+     */
+    fun deleteVoskModel(modelInfo: VoskModelInfo) {
+        viewModelScope.launch {
+            val success = voskModelManager.deleteModel(modelInfo)
+            if (success) {
+                loadVoskModels()
+                // If current type is Vosk and no models left, switch to Android
+                if (_uiState.value.speechRecognizerType == SpeechRecognizerType.VOSK_OFFLINE &&
+                    voskModelManager.getDownloadedModels().isEmpty()
+                ) {
+                    updateSpeechRecognizerType(SpeechRecognizerType.ANDROID_BUILTIN)
+                }
+            }
+        }
+    }
+
+    /**
+     * Resets Vosk download state to idle.
+     */
+    fun resetVoskDownloadState() {
+        voskModelManager.resetState()
+    }
+
+    /**
+     * Checks if Vosk is available for a locale.
+     */
+    fun isVoskAvailable(locale: Locale): Boolean {
+        return voskModelManager.isModelDownloaded(locale)
+    }
+
+    // ========== Whisper Recognition Settings ==========
+    // Note: Whisper models are now downloaded through ModelDownloadScreen (ModelDownloadManager)
+    // instead of a separate WhisperModelDownloadManager. The functions below are kept for
+    // compatibility but delegate to the main download manager.
+
+    /**
+     * Refreshes the Whisper models list.
+     * Call this when returning from the model download screen.
+     */
+    fun refreshWhisperModels() {
+        loadWhisperModels()
+    }
+
+    /**
+     * Checks if Whisper is available (any model downloaded).
+     */
+    fun isWhisperAvailable(): Boolean {
+        return downloadManager.getWhisperModels().any { downloadManager.isModelDownloaded(it.id) }
+    }
 }
 
 /**
@@ -321,5 +459,11 @@ data class SettingsUiState(
     val selectedOnDeviceModel: String? = null,
     val downloadedModels: List<ModelInfo> = emptyList(),
     // HuggingFace token for gated model downloads
-    val huggingFaceToken: String = ""
+    val huggingFaceToken: String = "",
+    // Voice recognition settings
+    val speechRecognizerType: SpeechRecognizerType = SpeechRecognizerType.ANDROID_BUILTIN,
+    val availableVoskModels: List<VoskModelInfo> = emptyList(),
+    val downloadedVoskModels: List<VoskModelInfo> = emptyList(),
+    // Whisper models (downloaded via ModelDownloadScreen)
+    val downloadedWhisperModels: List<WhisperModelInfo> = emptyList()
 )

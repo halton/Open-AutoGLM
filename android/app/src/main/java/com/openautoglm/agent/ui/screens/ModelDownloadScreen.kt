@@ -5,9 +5,21 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -48,110 +60,111 @@ fun ModelDownloadScreen(
     var selectedFilter by remember { mutableStateOf(ModelFilter.ALL) }
     var showDeleteDialog by remember { mutableStateOf<String?>(null) }
 
-    Column(
+    // Model List - computed once for filtering
+    val filteredModels = when (selectedFilter) {
+        ModelFilter.ALL -> uiState.availableModels
+        ModelFilter.GGUF -> uiState.availableModels.filter { it.format == ModelFormat.GGUF }
+        ModelFilter.MEDIAPIPE -> uiState.availableModels.filter { it.format == ModelFormat.MEDIAPIPE }
+        ModelFilter.WHISPER -> uiState.availableModels.filter { it.format == ModelFormat.WHISPER }
+        ModelFilter.DOWNLOADED -> uiState.availableModels.filter { uiState.downloadedModels.contains(it.id) }
+    }
+
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(vertical = 16.dp)
     ) {
         // Header
-        Text(
-            text = "On-Device Models",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
+        item(key = "header") {
+            Text(
+                text = "On-Device Models",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
 
         // Storage Info Card
-        StorageInfoCard(
-            totalModelSizeMB = uiState.totalModelSizeMB,
-            availableSpaceMB = uiState.availableSpaceMB,
-            downloadedCount = uiState.downloadedModels.size
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
+        item(key = "storage_info") {
+            StorageInfoCard(
+                totalModelSizeMB = uiState.totalModelSizeMB,
+                availableSpaceMB = uiState.availableSpaceMB,
+                downloadedCount = uiState.downloadedModels.size
+            )
+        }
 
         // Mirror Selection Card
-        MirrorSelectionCard(
-            selectedMirror = uiState.selectedMirror,
-            networkTestResults = uiState.networkTestResults,
-            isTestingNetwork = uiState.isTestingNetwork,
-            onMirrorSelected = { viewModel.setMirror(it) },
-            onTestNetwork = { viewModel.testNetworkConnectivity() },
-            onAutoSelect = { viewModel.autoSelectBestMirror() }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
+        item(key = "mirror_selection") {
+            MirrorSelectionCard(
+                selectedMirror = uiState.selectedMirror,
+                networkTestResults = uiState.networkTestResults,
+                isTestingNetwork = uiState.isTestingNetwork,
+                onMirrorSelected = { viewModel.setMirror(it) },
+                onTestNetwork = { viewModel.testNetworkConnectivity() },
+                onAutoSelect = { viewModel.autoSelectBestMirror() }
+            )
+        }
 
         // Filter Chips
-        FilterChips(
-            selectedFilter = selectedFilter,
-            onFilterSelected = { selectedFilter = it }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Model List
-        val filteredModels = when (selectedFilter) {
-            ModelFilter.ALL -> uiState.availableModels
-            ModelFilter.GGUF -> uiState.availableModels.filter { it.format == ModelFormat.GGUF }
-            ModelFilter.MEDIAPIPE -> uiState.availableModels.filter { it.format == ModelFormat.MEDIAPIPE }
-            ModelFilter.DOWNLOADED -> uiState.availableModels.filter { uiState.downloadedModels.contains(it.id) }
+        item(key = "filter_chips") {
+            FilterChips(
+                selectedFilter = selectedFilter,
+                onFilterSelected = { selectedFilter = it }
+            )
         }
 
         // Info banner about offline models
         if (uiState.downloadedModels.isEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(12.dp)
+            item(key = "info_banner") {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    )
                 ) {
-                    Text(
-                        text = "For Offline Use / 离线使用",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Download a Gemma model (MediaPipe) for offline inference. These models work immediately without additional setup.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "下载 Gemma 模型（MediaPipe）即可离线使用，无需额外配置。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                    )
+                    Column(
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Text(
+                            text = "For Offline Use / 离线使用",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Download Gemma (MediaPipe) for offline AI inference, or Whisper for offline speech recognition.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            text = "下载 Gemma（MediaPipe）进行离线AI推理，或下载 Whisper 进行离线语音识别。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        )
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
         }
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(filteredModels, key = { it.id }) { model ->
-                // Check if this gated model needs HuggingFace token
-                val needsHfToken = model.format == ModelFormat.MEDIAPIPE && !uiState.hasHuggingFaceToken
-                ModelCard(
-                    model = model,
-                    isDownloaded = uiState.downloadedModels.contains(model.id),
-                    isRecommended = model.id == uiState.recommendedModelId,
-                    downloadProgress = uiState.downloadProgress[model.id],
-                    progressInfo = uiState.downloadProgressInfo[model.id],
-                    error = uiState.downloadErrors[model.id],
-                    needsHfToken = needsHfToken,
-                    onDownloadClick = { viewModel.startDownload(model.id) },
-                    onCancelClick = { viewModel.cancelDownload(model.id) },
-                    onDeleteClick = { showDeleteDialog = model.id },
-                    onDismissError = { viewModel.clearError(model.id) }
-                )
-            }
+        // Model Cards
+        items(filteredModels, key = { it.id }) { model ->
+            // Check if this gated model needs HuggingFace token
+            val needsHfToken = model.format == ModelFormat.MEDIAPIPE && !uiState.hasHuggingFaceToken
+            ModelCard(
+                model = model,
+                isDownloaded = uiState.downloadedModels.contains(model.id),
+                isRecommended = model.id == uiState.recommendedModelId,
+                downloadProgress = uiState.downloadProgress[model.id],
+                progressInfo = uiState.downloadProgressInfo[model.id],
+                error = uiState.downloadErrors[model.id],
+                needsHfToken = needsHfToken,
+                onDownloadClick = { viewModel.startDownload(model.id) },
+                onCancelClick = { viewModel.cancelDownload(model.id) },
+                onDeleteClick = { showDeleteDialog = model.id },
+                onDismissError = { viewModel.clearError(model.id) }
+            )
         }
     }
 
@@ -403,6 +416,7 @@ private fun FilterChips(
     onFilterSelected: (ModelFilter) -> Unit
 ) {
     Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         FilterChip(
@@ -419,6 +433,11 @@ private fun FilterChips(
             selected = selectedFilter == ModelFilter.MEDIAPIPE,
             onClick = { onFilterSelected(ModelFilter.MEDIAPIPE) },
             label = { Text("Gemma") }
+        )
+        FilterChip(
+            selected = selectedFilter == ModelFilter.WHISPER,
+            onClick = { onFilterSelected(ModelFilter.WHISPER) },
+            label = { Text("Whisper") }
         )
         FilterChip(
             selected = selectedFilter == ModelFilter.DOWNLOADED,
@@ -492,17 +511,18 @@ private fun ModelCard(
                             text = when (model.format) {
                                 ModelFormat.GGUF -> "llama.cpp (GGUF)"
                                 ModelFormat.MEDIAPIPE -> "MediaPipe"
+                                ModelFormat.WHISPER -> "Whisper.cpp"
                             },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         // Offline status indicator
-                        if (model.format == ModelFormat.MEDIAPIPE) {
+                        if (model.format == ModelFormat.MEDIAPIPE || model.format == ModelFormat.WHISPER) {
                             AssistChip(
                                 onClick = {},
                                 label = {
                                     Text(
-                                        "Offline Ready",
+                                        if (model.format == ModelFormat.WHISPER) "Speech Recognition" else "Offline Ready",
                                         style = MaterialTheme.typography.labelSmall
                                     )
                                 },

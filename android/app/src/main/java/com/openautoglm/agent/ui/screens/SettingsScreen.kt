@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,6 +22,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.openautoglm.agent.data.entities.InferenceMode
 import com.openautoglm.agent.inference.InferenceProvider
 import com.openautoglm.agent.ui.viewmodels.SettingsViewModel
+import com.openautoglm.agent.voice.SpeechRecognizerType
+import com.openautoglm.agent.voice.VoskModelDownloadState
+import com.openautoglm.agent.voice.VoskModelInfo
+import com.openautoglm.agent.voice.WhisperModelDownloadState
+import com.openautoglm.agent.voice.WhisperModelInfo
 
 /**
  * Screen for app settings.
@@ -456,6 +463,14 @@ fun SettingsScreen(
             }
         }
 
+        Divider()
+
+        // Voice Recognition Settings Section
+        VoiceRecognitionSettings(
+            viewModel = viewModel,
+            uiState = uiState
+        )
+
         Spacer(modifier = Modifier.height(8.dp))
 
         // Save Button
@@ -766,5 +781,213 @@ private fun CustomApiSettings(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+/**
+ * Voice Recognition Settings section.
+ */
+@Composable
+private fun VoiceRecognitionSettings(
+    viewModel: SettingsViewModel,
+    uiState: com.openautoglm.agent.ui.viewmodels.SettingsUiState
+) {
+    val voskDownloadState by viewModel.voskDownloadState.collectAsState()
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = "Voice Recognition / 语音识别",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        Text(
+            text = "Choose speech recognition engine: Google (online), Vosk (fast offline), or Whisper (high-accuracy offline).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        // Recognizer Type Selection
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                SpeechRecognizerType.entries.forEach { type ->
+                    val isEnabled = when (type) {
+                        SpeechRecognizerType.ANDROID_BUILTIN -> true
+                        SpeechRecognizerType.VOSK_OFFLINE -> uiState.downloadedVoskModels.isNotEmpty()
+                        SpeechRecognizerType.WHISPER_OFFLINE -> uiState.downloadedWhisperModels.isNotEmpty()
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = uiState.speechRecognizerType == type,
+                            onClick = {
+                                if (isEnabled) {
+                                    viewModel.updateSpeechRecognizerType(type)
+                                }
+                            },
+                            enabled = isEnabled
+                        )
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            Text(
+                                text = when (type) {
+                                    SpeechRecognizerType.ANDROID_BUILTIN -> "Google (Online)"
+                                    SpeechRecognizerType.VOSK_OFFLINE -> "Vosk (Offline)"
+                                    SpeechRecognizerType.WHISPER_OFFLINE -> "Whisper (Offline - High Accuracy)"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (uiState.speechRecognizerType == type) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                            Text(
+                                text = when (type) {
+                                    SpeechRecognizerType.ANDROID_BUILTIN -> "Uses Google Speech Services (requires internet)"
+                                    SpeechRecognizerType.VOSK_OFFLINE -> if (isEnabled) "Fast on-device, lower accuracy" else "Download a model below to enable"
+                                    SpeechRecognizerType.WHISPER_OFFLINE -> if (isEnabled) "High accuracy multilingual (processes after recording)" else "Download a model below to enable"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Vosk Models Section
+        Text(
+            text = "Vosk Models (Fast / 快速)",
+            style = MaterialTheme.typography.titleSmall
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                uiState.availableVoskModels.forEach { model ->
+                    val isDownloaded = uiState.downloadedVoskModels.any { it.id == model.id }
+
+                    VoskModelItem(
+                        model = model,
+                        isDownloaded = isDownloaded,
+                        downloadState = voskDownloadState,
+                        onDownload = { viewModel.downloadVoskModel(model) },
+                        onDelete = { viewModel.deleteVoskModel(model) }
+                    )
+
+                    if (model != uiState.availableVoskModels.last()) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    }
+                }
+            }
+        }
+
+        // Note: Whisper models are now managed in the "Manage on-device models" screen
+    }
+}
+
+/**
+ * Individual Vosk model item with download/delete controls.
+ */
+@Composable
+private fun VoskModelItem(
+    model: VoskModelInfo,
+    isDownloaded: Boolean,
+    downloadState: VoskModelDownloadState,
+    onDownload: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = model.name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = "${model.sizeMB} MB - ${model.description}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // Show download progress
+            when (downloadState) {
+                is VoskModelDownloadState.Downloading -> {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        progress = { downloadState.progress },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = "%.1f / %.1f MB".format(downloadState.downloadedMB, downloadState.totalMB),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                is VoskModelDownloadState.Extracting -> {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Text(
+                        text = "Extracting...",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                is VoskModelDownloadState.Error -> {
+                    Text(
+                        text = "Error: ${downloadState.message}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                else -> {}
+            }
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        if (isDownloaded) {
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete model",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        } else {
+            val isDownloading = downloadState is VoskModelDownloadState.Downloading ||
+                downloadState is VoskModelDownloadState.Extracting
+
+            IconButton(
+                onClick = onDownload,
+                enabled = !isDownloading
+            ) {
+                if (isDownloading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = "Download model",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
     }
 }
