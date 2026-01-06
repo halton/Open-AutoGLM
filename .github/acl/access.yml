@@ -10,33 +10,33 @@ configuration:
     role: Maintain
   - member: haltonhuo
     role: Maintain
-  - team: edgechinaawmdev
-    role: Write
-  - member: ranyu
-    role: Write
-  - member: tandavid
-    role: Write
   - member: daimingpan
     role: Write
-  - member: guwa
-    role: Write
-  - member: yuhaibo
+  - team: edgechinaawmdev
     role: Write
   - member: ericwa
+    role: Write
+  - member: guwa
     role: Write
   - member: haoji
     role: Write
   - member: hezhan
     role: Write
-  - member: shulianghan
-    role: Write
   - member: linguo2
-    role: Write
-  - member: yananzhao
     role: Write
   - member: qi.yang
     role: Write
+  - member: ranyu
+    role: Write
+  - member: shulianghan
+    role: Write
+  - member: tandavid
+    role: Write
+  - member: yananzhao
+    role: Write
   - member: ygu
+    role: Write
+  - member: yuhaibo
     role: Write
   - member: yujiang
     role: Write
