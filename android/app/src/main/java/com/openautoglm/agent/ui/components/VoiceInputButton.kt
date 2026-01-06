@@ -150,18 +150,6 @@ fun VoiceInputIconButton(
     val isProcessing = voiceState is VoiceInputState.Processing
     val permissionDenied = permissionState == AudioPermissionState.PERMANENTLY_DENIED
 
-    // Pulsing animation for listening state
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (isListening) 1.15f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
-
     val iconColor = when {
         !enabled || permissionDenied -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
         isListening -> MaterialTheme.colorScheme.primary
@@ -172,7 +160,7 @@ fun VoiceInputIconButton(
     IconButton(
         onClick = onClick,
         enabled = enabled && !isProcessing,
-        modifier = modifier.scale(if (isListening) pulseScale else 1f)
+        modifier = modifier
     ) {
         when {
             isProcessing -> {
@@ -190,7 +178,7 @@ fun VoiceInputIconButton(
                         permissionDenied -> stringResource(R.string.voice_permission_denied)
                         else -> stringResource(R.string.voice_start_listening)
                     },
-                    tint = iconColor
+                    tint = if (isListening) MaterialTheme.colorScheme.error else iconColor
                 )
             }
         }

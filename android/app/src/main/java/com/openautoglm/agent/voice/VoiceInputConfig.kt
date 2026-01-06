@@ -37,11 +37,12 @@ data class VoiceInputConfig(
      * Silence duration before recognition stops (ms).
      * Shorter = faster response, longer = handles pauses.
      */
-    val silenceTimeoutMs: Long = 1500,
+    val silenceTimeoutMs: Long = 2500,
 
     /**
      * Prefer offline recognition if available.
-     * Improves privacy but may reduce accuracy.
+     * Improves privacy and works better with unstable network.
+     * Note: Set to false as SODA (offline) has session management issues on some devices.
      */
     val preferOffline: Boolean = false,
 
@@ -56,8 +57,8 @@ data class VoiceInputConfig(
          * Default configuration for Chinese language.
          */
         fun chinese() = VoiceInputConfig(
-            locale = Locale.CHINESE,
-            silenceTimeoutMs = 2000  // Slightly longer for tonal language
+            locale = Locale("zh", "CN"),  // Must include region for speech recognition
+            silenceTimeoutMs = 3000  // Longer for tonal language and natural pauses
         )
 
         /**
@@ -74,7 +75,7 @@ data class VoiceInputConfig(
             return when (language) {
                 "zh" -> chinese()
                 "zh-CN" -> chinese()
-                "zh-TW" -> VoiceInputConfig(locale = Locale.TRADITIONAL_CHINESE, silenceTimeoutMs = 2000)
+                "zh-TW" -> VoiceInputConfig(locale = Locale("zh", "TW"), silenceTimeoutMs = 3000)
                 "en" -> english()
                 "en-US" -> english()
                 "en-GB" -> VoiceInputConfig(locale = Locale.UK)
